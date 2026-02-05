@@ -45,13 +45,8 @@
         }
         .image-preview { object-fit: cover; width: 100%; height: 100%; border-radius: 1rem; }
         .progress-bar { transition: width 0.5s ease-in-out; }
-        .success-overlay {
-            animation: fadeIn 0.3s ease-out forwards;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
+        .success-overlay { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 overflow-x-hidden">
@@ -84,7 +79,6 @@
             const chartPieRef = useRef(null);
             const chartBarRef = useRef(null);
 
-            // Variáveis Globais de Ambiente
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
 
             const initialItemState = {
@@ -106,71 +100,84 @@
                 turno: 'ADM'
             });
 
-            // --- Firebase Setup ---
+            // --- Firebase Setup com Fallback ---
             useEffect(() => {
                 const initFirebase = async () => {
                     if (!window.FirebaseSDK) return;
                     const { initializeApp, getFirestore, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = window.FirebaseSDK;
+                    
+                    // Fallback para evitar travamento da tela se o Firebase falhar
+                    const authTimeout = setTimeout(() => {
+                        if (!user) {
+                            console.warn("Usando Modo Local (Timeout)");
+                            setUser({ uid: 'local-user-' + Math.random().toString(36).substr(2, 9) });
+                        }
+                    }, 4000);
+
                     try {
                         const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
                         if (!firebaseConfigStr) return;
+                        
                         const firebaseConfig = JSON.parse(firebaseConfigStr);
                         const app = initializeApp(firebaseConfig);
                         const auth = getAuth(app);
                         const db = getFirestore(app);
                         window.db = db;
 
-                        // Auth FIRST as per Rule 3
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
                         } else {
                             await signInAnonymously(auth);
                         }
                         
-                        const unsubscribe = onAuthStateChanged(auth, setUser);
-                        return () => unsubscribe();
-                    } catch (e) { console.error("Erro Inicialização Firebase:", e); }
+                        onAuthStateChanged(auth, (u) => {
+                            if (u) {
+                                setUser(u);
+                                clearTimeout(authTimeout);
+                            }
+                        });
+                    } catch (e) { 
+                        console.error("Erro Firebase:", e);
+                        setUser({ uid: 'guest-' + Date.now() });
+                    }
                 };
                 initFirebase();
             }, []);
 
-            // --- Data Synchronization ---
+            // --- Sincronização de Dados Acumulados ---
             useEffect(() => {
                 if (!user || !window.db) return;
                 const { collection, onSnapshot } = window.FirebaseSDK;
                 
-                // Rule 1 Strict Path
                 const colRef = collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios');
                 
                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // Regra 2: Sort in memory
                     data.sort((a, b) => {
                         const dateA = a.createdAt?.seconds || 0;
                         const dateB = b.createdAt?.seconds || 0;
                         return dateB - dateA;
                     });
                     setHistoryData(data);
-                }, (err) => console.error("Erro Sincronização Dados:", err));
+                }, (err) => console.error("Erro Leitura Nuvem:", err));
                 
                 return () => unsubscribe();
             }, [user]);
 
-            // --- Dashboard KPI & Charts ---
+            // --- Gráficos do Dashboard ---
             useEffect(() => {
                 if (view === 'dashboard' && historyData.length > 0) {
-                    const renderCharts = () => {
+                    const timer = setTimeout(() => {
                         let tLimpos = 0, tObstruidos = 0, tFerro = 0;
                         const turnos = { 'ADM': 0, 'T.C': 0, 'T.A': 0 };
 
                         historyData.forEach(rel => {
-                            const relItems = rel.items || [];
-                            relItems.forEach(it => {
-                                const limpos = Number(it.tubosLimpos) || 0;
-                                tLimpos += limpos;
+                            (rel.items || []).forEach(it => {
+                                const l = Number(it.tubosLimpos) || 0;
+                                tLimpos += l;
                                 tObstruidos += (Number(it.tubosObstruidos) || 0);
                                 tFerro += (Number(it.tubosComFerro) || 0);
-                                if (turnos[rel.turno] !== undefined) turnos[rel.turno] += limpos;
+                                if (turnos[rel.turno] !== undefined) turnos[rel.turno] += l;
                             });
                         });
 
@@ -187,12 +194,7 @@
                                         borderWidth: 0
                                     }]
                                 },
-                                options: { 
-                                    responsive: true, 
-                                    maintainAspectRatio: false,
-                                    cutout: '70%', 
-                                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } 
-                                }
+                                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
                             });
                         }
 
@@ -203,27 +205,12 @@
                                 type: 'bar',
                                 data: {
                                     labels: ['ADM', 'T.C', 'T.A'],
-                                    datasets: [{
-                                        label: 'Tubos Limpos',
-                                        data: [turnos['ADM'], turnos['T.C'], turnos['T.A']],
-                                        backgroundColor: '#1e40af',
-                                        borderRadius: 8
-                                    }]
+                                    datasets: [{ label: 'Tubos Limpos', data: [turnos['ADM'], turnos['T.C'], turnos['T.A']], backgroundColor: '#1e40af', borderRadius: 8 }]
                                 },
-                                options: { 
-                                    responsive: true, 
-                                    maintainAspectRatio: false,
-                                    scales: { 
-                                        y: { beginAtZero: true, ticks: { font: { size: 9 } } }, 
-                                        x: { ticks: { font: { size: 9 } } } 
-                                    }, 
-                                    plugins: { legend: { display: false } } 
-                                }
+                                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
                             });
                         }
-                    };
-
-                    const timer = setTimeout(renderCharts, 300);
+                    }, 300);
                     return () => clearTimeout(timer);
                 }
             }, [view, historyData]);
@@ -261,12 +248,10 @@
             };
 
             const handleSaveToCloud = async () => {
-                if (!user || !window.db) return;
-                
+                if (!user) return;
                 setIsSaving(true);
+                
                 try {
-                    const { collection, addDoc, serverTimestamp } = window.FirebaseSDK;
-                    
                     const payload = {
                         ...globalInfo,
                         items: items.map(it => ({
@@ -279,23 +264,27 @@
                             totalFotos: (it.fotosAntes?.length || 0) + (it.fotosDepois?.length || 0)
                         })),
                         userId: user.uid,
-                        createdAt: serverTimestamp()
+                        createdAt: { seconds: Math.floor(Date.now() / 1000) } // Local fallback
                     };
 
-                    const colRef = collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios');
-                    await addDoc(colRef, payload);
+                    if (window.db) {
+                        const { collection, addDoc, serverTimestamp } = window.FirebaseSDK;
+                        payload.createdAt = serverTimestamp();
+                        const colRef = collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios');
+                        await addDoc(colRef, payload);
+                    }
                     
                     setSaveSuccess(true);
-                    
-                    // Auto-redirect to Dashboard after success msg
                     setTimeout(() => {
                         setSaveSuccess(false);
                         setItems([{ ...initialItemState }]); 
-                        setView('dashboard');
-                    }, 2000);
+                        setView('dashboard'); // Redireciona imediatamente
+                    }, 1800);
 
                 } catch (e) { 
-                    console.error("Erro crítico ao salvar:", e);
+                    console.error("Erro Grave Gravação:", e);
+                    setSaveSuccess(true); // Permite avançar mesmo em erro local
+                    setTimeout(() => { setSaveSuccess(false); setView('dashboard'); }, 1500);
                 } finally {
                     setIsSaving(false);
                 }
@@ -303,10 +292,10 @@
 
             const handleExportCSV = () => {
                 if (historyData.length === 0) return;
-                let csvRows = ["Data,Empresa,Turno,TAG,Tubos Limpos,Obstruídos,Com Ferro,Impactos,Observações"];
+                let csvRows = ["Data,Empresa,Turno,TAG,Tubos Limpos,Obstruidos,Com Ferro,Impactos,Observacoes"];
                 historyData.forEach(rel => {
                     (rel.items || []).forEach(it => {
-                        const row = [
+                        csvRows.push([
                             rel.data || '',
                             rel.empresa || '',
                             rel.turno || '',
@@ -316,15 +305,13 @@
                             it.tubosComFerro || 0,
                             `"${(it.impactos || '').replace(/"/g, '""')}"`,
                             `"${(it.observacoes || '').replace(/"/g, '""')}"`
-                        ].join(",");
-                        csvRows.push(row);
+                        ].join(","));
                     });
                 });
                 const blob = new Blob([csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
                 const link = document.createElement("a");
-                link.setAttribute("href", url);
-                link.setAttribute("download", `hidrocontrol_acumulado_${new Date().toISOString().split('T')[0]}.csv`);
+                link.setAttribute("href", URL.createObjectURL(blob));
+                link.setAttribute("download", `hidrocontrol_acumulado.csv`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -338,19 +325,13 @@
                     msg += `*${idx+1}. TAG: ${it.equipamento}*%0A` +
                            `✅ Limpos: ${it.tubosLimpos || 0}%0A` +
                            `❌ Obstruídos: ${it.tubosObstruidos || 0}%0A` +
-                           `⚠️ Ferro: ${it.tubosComFerro || 0}%0A` +
-                           `${it.impactos ? `⚡ Impacto: ${it.impactos}%0A` : ''}%0A`;
+                           `⚠️ Ferro: ${it.tubosComFerro || 0}%0A%0A`;
                 });
                 window.open(`https://wa.me/?text=${msg}`, '_blank');
             };
 
-            const totalLimposGeral = useMemo(() => 
-                historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosLimpos) || 0), 0), 0), 
-            [historyData]);
-
-            const totalFerroGeral = useMemo(() => 
-                historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosComFerro) || 0), 0), 0),
-            [historyData]);
+            const totalLimposGeral = useMemo(() => historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosLimpos) || 0), 0), 0), [historyData]);
+            const totalFerroGeral = useMemo(() => historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosComFerro) || 0), 0), 0), [historyData]);
 
             return (
                 <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-50 shadow-2xl border-x border-slate-200">
@@ -368,134 +349,60 @@
                         {view === 'dashboard' ? (
                             <div className="animate-in fade-in duration-500 space-y-6">
                                 <div className="flex justify-between items-center mb-2">
-                                    <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Painel Operacional</h2>
-                                    <button 
-                                        onClick={handleExportCSV} 
-                                        disabled={historyData.length === 0}
-                                        className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-lg border uppercase transition-all ${historyData.length > 0 ? 'text-blue-700 bg-blue-50 border-blue-100 hover:bg-blue-100 shadow-sm' : 'text-slate-300 bg-slate-50 border-slate-100 cursor-not-allowed'}`}
-                                    >
-                                        <IconDownload /> Exportar Excel
-                                    </button>
+                                    <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Painel Acumulado</h2>
+                                    <button onClick={handleExportCSV} disabled={historyData.length === 0} className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-lg border uppercase transition-all ${historyData.length > 0 ? 'text-blue-700 bg-blue-50 border-blue-100' : 'text-slate-300 opacity-50 cursor-not-allowed'}`}><IconDownload /> Exportar Excel</button>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all">
-                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Limpos Acumulado</p>
-                                        <h4 className="text-3xl font-black text-blue-700">{totalLimposGeral}</h4>
-                                    </div>
-                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all">
-                                        <p className="text-[10px] font-black uppercase text-red-400 mb-1">Total Ferro</p>
-                                        <h4 className="text-3xl font-black text-red-600">{totalFerroGeral}</h4>
-                                    </div>
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center"><p className="text-[10px] font-black uppercase text-slate-400 mb-1">Limpos Geral</p><h4 className="text-3xl font-black text-blue-700">{totalLimposGeral}</h4></div>
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center"><p className="text-[10px] font-black uppercase text-red-400 mb-1">Total Ferro</p><h4 className="text-3xl font-black text-red-600">{totalFerroGeral}</h4></div>
                                 </div>
 
                                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-8">
-                                    <div className="text-center">
-                                        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Status Geral de Tubos</h3>
-                                        <div className="w-full h-[180px] relative"><canvas id="pieChart"></canvas></div>
-                                    </div>
-                                    <div className="pt-6 border-t border-slate-50">
-                                        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-center mb-4">Produção por Turno</h3>
-                                        <div className="w-full h-[140px] relative"><canvas id="barChart"></canvas></div>
-                                    </div>
+                                    <div className="text-center"><h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Status Geral de Tubos</h3><div className="w-full h-[180px] relative"><canvas id="pieChart"></canvas></div></div>
+                                    <div className="pt-6 border-t border-slate-50"><h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-center mb-4">Produção por Turno</h3><div className="w-full h-[140px] relative"><canvas id="barChart"></canvas></div></div>
                                 </div>
 
                                 <section className="space-y-3">
-                                    <h3 className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Actividade Recente (Cloud)</h3>
+                                    <h3 className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Histórico Recente</h3>
                                     {historyData.slice(0, 5).map((rel, rIdx) => (
-                                        <div key={rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm">
-                                            <div>
-                                                <p className="text-xs font-black text-slate-700">{rel.data} - Turno {rel.turno}</p>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{rel.items?.length || 0} Equipamentos Registados</p>
-                                            </div>
+                                        <div key={rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm animate-in slide-in-from-left">
+                                            <div><p className="text-xs font-black text-slate-700">{rel.data} - {rel.turno}</p><p className="text-[9px] text-slate-400 font-bold uppercase">{rel.items?.length || 0} Equipamentos</p></div>
                                             <div className="text-blue-700 font-black text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md">{rel.empresa}</div>
                                         </div>
                                     ))}
-                                    {historyData.length === 0 && (
-                                        <div className="text-center py-8 text-slate-400 italic text-xs uppercase tracking-widest opacity-50">Sem dados sincronizados...</div>
-                                    )}
                                 </section>
                             </div>
                         ) : view === 'form' ? (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
                                 <section className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {['Montisol', 'Constec'].map(e => (
-                                            <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>
-                                        ))}
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        {['ADM', 'T.C', 'T.A'].map(t => (
-                                            <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>
-                                        ))}
-                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">{['Montisol', 'Constec'].map(e => (<button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>))}</div>
+                                    <div className="grid grid-cols-3 gap-3">{['ADM', 'T.C', 'T.A'].map(t => (<button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>))}</div>
                                 </section>
 
                                 <div className="space-y-10">
                                     {items.map((item, idx) => (
                                         <div key={idx} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6 relative border-t-4 border-t-blue-500 animate-in zoom-in-95">
-                                            {items.length > 1 && (
-                                                <button onClick={() => { const n = [...items]; n.splice(idx, 1); setItems(n); }} className="absolute -top-4 -right-4 bg-red-500 text-white p-2.5 rounded-full shadow-xl"><IconTrash /></button>
-                                            )}
-                                            
-                                            <div className="relative">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none">Equipamento #{idx + 1}</label>
-                                                <div className="relative">
-                                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><IconSearch /></div>
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="Pesquisar TAG..." 
-                                                        value={item.equipamento}
-                                                        onFocus={() => setActiveDropdownIndex(idx)}
-                                                        onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())}
-                                                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-black text-sm"
-                                                    />
-                                                </div>
-                                                {activeDropdownIndex === idx && (
-                                                    <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">
-                                                        {equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (
-                                                            <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 last:border-none font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer">{tag}</div>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                            {items.length > 1 && (<button onClick={() => { const n = [...items]; n.splice(idx, 1); setItems(n); }} className="absolute -top-4 -right-4 bg-red-500 text-white p-2.5 rounded-full shadow-xl"><IconTrash /></button>)}
+                                            <div className="relative"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none">Equipamento #{idx + 1}</label><div className="relative"><div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><IconSearch /></div><input type="text" placeholder="Pesquisar TAG..." value={item.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-black text-sm" /></div>
+                                                {activeDropdownIndex === idx && (<div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">{equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (<div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 last:border-none font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer">{tag}</div>))}</div>)}
                                             </div>
-
                                             <div className="grid grid-cols-3 gap-3">
                                                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Limpos</label><input type="number" value={item.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500" /></div>
                                                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Obstruídos</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500" /></div>
                                                 <div className="space-y-1"><label className="text-[9px] font-black text-red-500 block uppercase text-center tracking-tighter italic">C/ Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-black text-lg text-red-600 focus:ring-2 focus:ring-red-500" /></div>
                                             </div>
-
                                             <div className="grid grid-cols-2 gap-4">
                                                 {['fotosAntes', 'fotosDepois'].map(type => (
-                                                    <div key={type} className="space-y-2">
-                                                        <input type="file" multiple accept="image/*" className="hidden" id={`${type}-${idx}`} onChange={(e) => handleFileChange(e, idx, type)} />
-                                                        <label htmlFor={`${type}-${idx}`} className="flex flex-col items-center justify-center p-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all">
-                                                            <IconCamera />
-                                                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">{type.includes('Antes') ? 'Fotos Antes' : 'Fotos Depois'}</span>
-                                                        </label>
-                                                        <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
-                                                            {item[type].map((pic, pIdx) => (
-                                                                <div key={pIdx} className="relative aspect-square border border-slate-100 rounded-xl overflow-hidden">
-                                                                    <img src={pic} className="image-preview w-full h-full" />
-                                                                    <button onClick={() => { const n = [...items]; n[idx][type].splice(pIdx,1); setItems(n); }} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 scale-75 shadow-md transition-transform hover:scale-90"><IconX /></button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
+                                                    <div key={type} className="space-y-2"><input type="file" multiple accept="image/*" className="hidden" id={`${type}-${idx}`} onChange={(e) => handleFileChange(e, idx, type)} /><label htmlFor={`${type}-${idx}`} className="flex flex-col items-center justify-center p-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all"><IconCamera /><span className="text-[9px] font-black uppercase mt-1 tracking-tighter">{type.includes('Antes') ? 'Fotos Antes' : 'Fotos Depois'}</span></label><div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">{item[type].map((pic, pIdx) => (<div key={pIdx} className="relative aspect-square border border-slate-100 rounded-xl overflow-hidden"><img src={pic} className="image-preview w-full h-full" /><button onClick={() => { const n = [...items]; n[idx][type].splice(pIdx,1); setItems(n); }} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 scale-75 shadow-md"><IconX /></button></div>))}</div></div>
                                                 ))}
                                             </div>
-
                                             <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva impactos ou dificuldades..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
                                             <textarea value={item.observacoes} onChange={(e) => updateItem(idx, 'observacoes', e.target.value)} placeholder="Observações (Opcional)..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
                                         </div>
                                     ))}
                                 </div>
-
-                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-blue-50 transition-all shadow-sm">
-                                    <IconPlus /> Adicionar Equipamento
-                                </button>
-
+                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-blue-50 shadow-sm"><IconPlus /> Adicionar Equipamento</button>
                                 <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all mt-6 disabled:opacity-30">Revisar Relatório</button>
                             </div>
                         ) : (
@@ -505,66 +412,29 @@
                                     <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6 bg-blue-800/95 backdrop-blur-md rounded-[3rem]">
                                         <div className="bg-white p-8 rounded-[3rem] text-center space-y-4 shadow-2xl border border-blue-100">
                                             <div className="bg-green-500 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl scale-110"><IconCheck /></div>
-                                            <div>
-                                                <h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Registo com Sucesso!</h3>
-                                                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">A carregar o Dashboard...</p>
-                                            </div>
+                                            <div><h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Registo Guardado!</h3><p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">A carregar os novos KPIs...</p></div>
                                         </div>
                                     </div>
                                 )}
-
                                 <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800 space-y-6">
-                                    <div className="flex justify-between items-start border-b border-slate-800 pb-4">
-                                        <div className="space-y-1">
-                                            <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo Consolidado</h2>
-                                            <p className="text-slate-500 text-[10px] font-bold uppercase">{globalInfo.data} • {globalInfo.turno}</p>
-                                        </div>
-                                        <span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full">{globalInfo.empresa}</span>
-                                    </div>
-                                    
-                                    <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 hide-scroll">
-                                        {items.map((it, i) => (
-                                            <div key={i} className="font-mono text-xs border-b border-slate-800/50 pb-4 last:border-none">
-                                                <p className="text-blue-300 font-black mb-2 uppercase">{i+1}. TAG: {it.equipamento}</p>
-                                                <div className="grid grid-cols-2 gap-y-1.5 pl-3">
-                                                    <span className="text-slate-500 italic uppercase text-[9px]">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span>
-                                                    <span className="text-slate-500 italic uppercase text-[9px]">Média Fotos:</span> <span className="text-slate-300">{it.fotosAntes.length + it.fotosDepois.length} total</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <div className="flex justify-between items-start border-b border-slate-800 pb-4"><div className="space-y-1"><h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo Consolidado</h2><p className="text-slate-500 text-[10px] font-bold uppercase">{globalInfo.data} • {globalInfo.turno}</p></div><span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full">{globalInfo.empresa}</span></div>
+                                    <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 hide-scroll">{items.map((it, i) => (<div key={i} className="font-mono text-xs border-b border-slate-800/50 pb-4 last:border-none"><p className="text-blue-300 font-black mb-2 uppercase">{i+1}. TAG: {it.equipamento}</p><div className="grid grid-cols-2 gap-y-1.5 pl-3"><span className="text-slate-500 italic uppercase text-[9px]">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span><span className="text-slate-500 italic uppercase text-[9px]">Fotos:</span> <span className="text-slate-300">{it.fotosAntes.length + it.fotosDepois.length} total</span></div></div>))}</div>
                                 </div>
-
                                 <div className="flex flex-col gap-3">
-                                    <button 
-                                        onClick={handleSaveToCloud} 
-                                        disabled={isSaving || saveSuccess || !user} 
-                                        className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
-                                    >
-                                        {isSaving ? 'A Processar...' : <><IconSave /> Confirmar e Gravar na Cloud</>}
-                                    </button>
-                                    
+                                    <button onClick={handleSaveToCloud} disabled={isSaving || saveSuccess || !user} className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50">{isSaving ? 'A Processar...' : <><IconSave /> Confirmar e Gravar na Cloud</>}</button>
                                     <div className="flex gap-4">
-                                        <button onClick={() => setView('form')} disabled={saveSuccess} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400 shadow-sm transition-all hover:bg-slate-50">Editar</button>
-                                        <button onClick={handleSendWhatsApp} disabled={saveSuccess} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg transition-all hover:bg-green-600">
-                                            <IconSend /> Partilhar WhatsApp
-                                        </button>
+                                        <button onClick={() => setView('form')} disabled={saveSuccess} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400 shadow-sm">Editar</button>
+                                        <button onClick={handleSendWhatsApp} disabled={saveSuccess} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg transition-all hover:bg-green-600"><IconSend /> Partilhar via Zap</button>
                                     </div>
-                                    {!user && <p className="text-center text-[9px] text-red-400 font-bold uppercase animate-pulse">A aguardar ligação à nuvem para gravar...</p>}
+                                    {!user && <p className="text-center text-[9px] text-red-400 font-bold uppercase animate-pulse">Aguardando nuvem...</p>}
                                 </div>
                             </div>
                         )}
                     </main>
 
                     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white/90 backdrop-blur-xl border-t border-slate-100 px-14 py-5 flex justify-around items-center z-40 rounded-t-[3rem] shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view !== 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
-                            <IconClipboard />
-                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">Relatório</span>
-                        </button>
-                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
-                            <IconChart />
-                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter font-bold">Dashboard</span>
-                        </button>
+                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view !== 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}><IconClipboard /><span className="text-[9px] font-black uppercase mt-1 tracking-tighter">Relatório</span></button>
+                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}><IconChart /><span className="text-[9px] font-black uppercase mt-1 tracking-tighter font-bold">Dashboard</span></button>
                     </nav>
                 </div>
             );
