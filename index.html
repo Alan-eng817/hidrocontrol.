@@ -59,11 +59,12 @@
             const [saveSuccess, setSaveSuccess] = useState(false);
             const [isSaving, setIsSaving] = useState(false);
             const [activeDropdownIndex, setActiveDropdownIndex] = useState(null);
+            const [syncStatus, setSyncStatus] = useState('A conectar...');
             
             const chartPieRef = useRef(null);
             const chartBarRef = useRef(null);
             
-            // Constante de Identificação do Aplicativo (Unificar caminhos na nuvem)
+            // Constante estrita de identificação
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-alumar-v1-prod';
 
             const initialItemState = {
@@ -83,7 +84,7 @@
                 turno: 'ADM'
             });
 
-            // --- Regra 3: Autenticação Resiliente ---
+            // --- Autenticação ---
             useEffect(() => {
                 const initialize = async () => {
                     let count = 0;
@@ -92,10 +93,9 @@
                         count++;
                     }
 
-                    const localIdentity = { uid: 'u-' + Math.random().toString(36).substr(2, 5), isLocal: true };
-                    
                     if (!window.FB_CORE) {
-                        setUser(localIdentity);
+                        setUser({ uid: 'local-user', isLocal: true });
+                        setSyncStatus('Modo Offline');
                         return;
                     }
 
@@ -103,7 +103,11 @@
                     
                     try {
                         const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-                        if (!configStr) { setUser(localIdentity); return; }
+                        if (!configStr) {
+                            setUser({ uid: 'guest', isLocal: true });
+                            setSyncStatus('Sem config');
+                            return;
+                        }
 
                         const config = JSON.parse(configStr);
                         const app = initializeApp(config);
@@ -118,39 +122,43 @@
                         }
 
                         onAuthStateChanged(auth, (u) => {
-                            if (u) setUser(u);
-                            else setUser(localIdentity);
+                            if (u) {
+                                setUser(u);
+                                setSyncStatus('Ligado');
+                            }
                         });
                     } catch (e) {
-                        setUser(localIdentity);
+                        setUser({ uid: 'local-err', isLocal: true });
+                        setSyncStatus('Erro de rede');
                     }
                 };
                 initialize();
             }, []);
 
-            // --- Regra 1 e 2: Sincronização em Tempo Real ---
+            // --- Sincronização de Dados (Regra 1 e 2) ---
             useEffect(() => {
                 if (!user || !db || !window.FB_CORE) return;
                 const { collection, onSnapshot } = window.FB_CORE;
                 
-                // Caminho estrito para os dados públicos do artefato
+                // REGRA 1: Caminho estrito
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'relatorios');
                 
                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ 
-                        id: doc.id, 
-                        ...doc.data() 
-                    }));
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     
-                    // Ordenação manual para evitar erro de indexação no Firestore (Regra 2)
+                    // REGRA 2: Ordenação manual robusta
                     data.sort((a, b) => {
-                        const timeA = a.createdAt?.seconds || a.localTimestamp || 0;
-                        const timeB = b.createdAt?.seconds || b.localTimestamp || 0;
-                        return timeB - timeA;
+                        const tA = a.localTimestamp || a.createdAt?.seconds || 0;
+                        const tB = b.localTimestamp || b.createdAt?.seconds || 0;
+                        return tB - tA;
                     });
                     
                     setHistoryData(data);
-                }, (err) => console.warn("Modo Offline Ativo ou Erro de Permissão."));
+                    setSyncStatus('Actualizado');
+                }, (err) => {
+                    console.error("Erro no listener:", err);
+                    setSyncStatus('Erro Permissão');
+                });
                 
                 return () => unsubscribe();
             }, [user, db]);
@@ -174,7 +182,7 @@
                 return { limpos, ferro, turnosMap };
             }, [historyData]);
 
-            // --- Gráficos do Dashboard ---
+            // --- Gráficos ---
             useEffect(() => {
                 if (view === 'dashboard' && historyData.length > 0) {
                     const timer = setTimeout(() => {
@@ -196,7 +204,7 @@
                                     labels: ['Limpos', 'Obstruídos', 'Com Ferro'],
                                     datasets: [{ data: [tLimpos, tObstruidos, tFerro], backgroundColor: ['#22c55e', '#ef4444', '#f59e0b'], borderWidth: 0 }]
                                 },
-                                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, weight: 'bold' } } } } }
+                                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } }
                             });
                         }
 
@@ -214,15 +222,10 @@
                                         borderRadius: 6
                                     }]
                                 },
-                                options: { 
-                                    responsive: true, 
-                                    maintainAspectRatio: false, 
-                                    scales: { y: { beginAtZero: true, ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 10, weight: 'bold' } } } }, 
-                                    plugins: { legend: { display: false } } 
-                                }
+                                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
                             });
                         }
-                    }, 400);
+                    }, 500);
                     return () => clearTimeout(timer);
                 }
             }, [view, historyData, stats]);
@@ -296,7 +299,7 @@
 
             const handleExportCSV = () => {
                 if (historyData.length === 0) return;
-                let rows = ["Data,Empresa,Turno,TAG,Limpos,Obstruídos,Ferro,Impactos"];
+                let rows = ["Data,Empresa,Turno,TAG,Tubos Limpos,Obstruídos,Ferro,Impactos"];
                 historyData.forEach(rel => {
                     (rel.items || []).forEach(it => {
                         rows.push([rel.data, rel.empresa, rel.turno, it.equipamento, it.tubosLimpos, it.tubosObstruidos, it.tubosComFerro, `"${it.impactos}"`].join(","));
@@ -305,7 +308,7 @@
                 const blob = new Blob([rows.join("\n")], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
-                link.download = `hidrocontrol_acumulado_${new Date().toISOString().split('T')[0]}.csv`;
+                link.download = `hidrocontrol_excel.csv`;
                 link.click();
             };
 
@@ -322,21 +325,21 @@
                     <header className="bg-blue-800 text-white p-6 sticky top-0 z-40 shadow-lg flex items-center justify-between rounded-b-3xl">
                         <div className="flex items-center gap-3">
                             <IconClipboard />
-                            <h1 className="font-bold text-xl tracking-tight uppercase tracking-tighter">Hidro<span className="text-blue-300">Control</span></h1>
+                            <h1 className="font-bold text-xl tracking-tight uppercase tracking-tighter leading-none">Hidro<span className="text-blue-300">Control</span></h1>
                         </div>
-                        <div className="text-[10px] font-black bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 uppercase tracking-tighter">
-                            {view === 'dashboard' ? 'Analytics' : globalInfo.data}
+                        <div className="flex flex-col items-end">
+                            <div className="text-[10px] font-black bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 uppercase leading-none mb-1">{globalInfo.data}</div>
+                            <div className={`text-[8px] font-bold uppercase tracking-widest ${syncStatus === 'Ligado' || syncStatus === 'Actualizado' ? 'text-green-400' : 'text-yellow-400'}`}>{syncStatus}</div>
                         </div>
                     </header>
 
                     <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-28">
                         {view === 'dashboard' ? (
-                            /* --- DASHBOARD --- */
                             <div className="animate-in fade-in duration-500 space-y-6">
                                 <div className="flex justify-between items-center">
                                     <div className="flex flex-col">
-                                        <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Dados Sincronizados</h2>
-                                        <span className="text-[9px] font-bold text-blue-600 uppercase mt-1 tracking-tighter">{historyData.length} relatórios na nuvem</span>
+                                        <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Visão de Produção</h2>
+                                        <span className="text-[9px] font-bold text-blue-600 uppercase mt-1 tracking-tighter">{historyData.length} registos encontrados</span>
                                     </div>
                                     <button onClick={handleExportCSV} disabled={historyData.length === 0} className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-lg border uppercase transition-all ${historyData.length > 0 ? 'text-blue-700 bg-blue-50 border-blue-100 hover:bg-blue-100 shadow-sm' : 'text-slate-300 opacity-50'}`}><IconDownload /> Excel</button>
                                 </div>
@@ -364,17 +367,17 @@
                                 </div>
 
                                 <section className="space-y-3">
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase text-center tracking-widest">Logs de Produção Recentes</h3>
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase text-center tracking-widest uppercase">Histórico Recente</h3>
                                     {historyData.slice(0, 15).map((rel, rIdx) => (
                                         <div key={rel.id || rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm animate-in slide-in-from-left">
                                             <div className="flex flex-col">
                                                 <p className="text-xs font-black text-slate-700">{rel.data} - {rel.turno}</p>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{(rel.items || []).length} Equipamentos arquivados</p>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{(rel.items || []).length} Equipamentos</p>
                                             </div>
                                             <div className="text-blue-700 font-bold text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md border border-blue-100 leading-none">{rel.empresa}</div>
                                         </div>
                                     ))}
-                                    {historyData.length === 0 && <div className="text-center py-10 opacity-40 italic text-[10px] uppercase tracking-widest">Sincronizando com a Cloud...</div>}
+                                    {historyData.length === 0 && <div className="text-center py-10 opacity-40 italic text-[10px] uppercase tracking-widest">Sincronizando Dashboard...</div>}
                                 </section>
                             </div>
                         ) : view === 'form' ? (
@@ -393,25 +396,25 @@
 
                                 <div className="space-y-8">
                                     {items.map((item, idx) => (
-                                        <div key={idx} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-6 relative card-shadow border-t-4 border-t-blue-500">
-                                            {items.length > 1 && (<button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="absolute -top-4 -right-4 bg-red-500 text-white p-2.5 rounded-full shadow-xl"><IconTrash /></button>)}
+                                        <div key={idx} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-6 relative card-shadow border-t-4 border-t-blue-500 animate-in zoom-in-95">
+                                            {items.length > 1 && (<button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="absolute -top-4 -right-4 bg-red-500 text-white p-2.5 rounded-full shadow-xl transition-transform active:scale-90"><IconTrash /></button>)}
                                             
                                             <div className="relative">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">TAG do Equipamento</label>
-                                                <input type="text" placeholder="Pesquisar..." value={item.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm" />
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Equipamento (TAG)</label>
+                                                <input type="text" placeholder="Pesquisar..." value={item.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all" />
                                                 {activeDropdownIndex === idx && (
                                                     <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">
                                                         {equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (
-                                                            <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer tracking-tighter">{tag}</div>
+                                                            <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer tracking-tighter transition-colors">{tag}</div>
                                                         ))}
                                                     </div>
                                                 )}
                                             </div>
 
                                             <div className="grid grid-cols-3 gap-3">
-                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block leading-none">Limpos</label><input type="number" value={item.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg focus:ring-2 focus:ring-blue-500 transition-all" /></div>
-                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block leading-none">Obs.</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg focus:ring-2 focus:ring-blue-500 transition-all" /></div>
-                                                <div className="space-y-1"><label className="text-[9px] font-bold text-red-500 uppercase text-center block font-black leading-none">Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-bold text-lg text-red-600 focus:ring-2 focus:ring-red-500 transition-all" /></div>
+                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block leading-none">Limpos</label><input type="number" value={item.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg focus:ring-2 focus:ring-blue-500 transition-all shadow-inner" /></div>
+                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block leading-none">Obs.</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg focus:ring-2 focus:ring-blue-500 transition-all shadow-inner" /></div>
+                                                <div className="space-y-1"><label className="text-[9px] font-bold text-red-500 uppercase text-center block font-black leading-none">Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50/50 border border-red-100 rounded-2xl text-center font-bold text-lg text-red-600 focus:ring-2 focus:ring-red-500 transition-all shadow-inner" /></div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
@@ -422,7 +425,7 @@
                                                             <IconCamera />
                                                             <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">{type === 'fotosAntes' ? 'Antes' : 'Depois'}</span>
                                                         </label>
-                                                        <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
+                                                        <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto pr-1">
                                                             {(item[type] || []).map((pic, pIdx) => (
                                                                 <div key={pIdx} className="relative aspect-square border border-slate-100 rounded-xl overflow-hidden shadow-sm">
                                                                     <img src={pic} className="image-preview" />
@@ -437,13 +440,13 @@
                                                     </div>
                                                 ))}
                                             </div>
-                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva dificuldades identificadas..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
+                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva dificuldades ou ocorrências..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium transition-all shadow-inner"></textarea>
                                         </div>
                                     ))}
                                 </div>
                                 
                                 <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all leading-none"><IconPlus /> Novo Equipamento</button>
-                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.15em] text-xs shadow-2xl active:scale-95 transition-all disabled:opacity-30 leading-none">Revisar Relatório</button>
+                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-bold uppercase tracking-[0.15em] text-xs shadow-2xl active:scale-95 transition-all disabled:opacity-30 leading-none">Revisar Relatório</button>
                             </div>
                         ) : (
                             /* --- PREVIEW --- */
@@ -453,8 +456,8 @@
                                         <div className="bg-white p-10 rounded-[3rem] text-center space-y-4 shadow-2xl border border-blue-100 scale-110">
                                             <div className="bg-green-500 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl scale-110"><IconCheck /></div>
                                             <div>
-                                                <h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Registo Guardado!</h3>
-                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 leading-tight">O histórico industrial foi atualizado.<br/>Sincronizando Dashboard...</p>
+                                                <h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Arquivado com Sucesso!</h3>
+                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 leading-tight">O histórico industrial foi actualizado.<br/>Sincronizando Dashboard...</p>
                                             </div>
                                         </div>
                                     </div>
@@ -475,7 +478,7 @@
                                                 <p className="text-blue-300 font-black mb-3 uppercase tracking-tighter">{i+1}. TAG: {it.equipamento}</p>
                                                 <div className="grid grid-cols-2 gap-y-1.5 pl-3">
                                                     <span className="text-slate-500 italic uppercase text-[9px]">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span>
-                                                    <span className="text-slate-500 italic uppercase text-[9px]">Fotos:</span> <span className="text-slate-300">{(it.fotosAntes || []).length + (it.fotosDepois || []).length} arquivos</span>
+                                                    <span className="text-slate-500 italic uppercase text-[9px]">Fotos:</span> <span className="text-slate-300">{(it.fotosAntes || []).length + (it.fotosDepois || []).length} total</span>
                                                 </div>
                                             </div>
                                         ))}
@@ -488,7 +491,7 @@
                                         disabled={isSaving || saveSuccess || !user} 
                                         className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50 leading-none"
                                     >
-                                        {isSaving ? 'Gravando...' : <><IconSave /> Confirmar e Gravar na Cloud</>}
+                                        {isSaving ? 'A Processar...' : <><IconSave /> Finalizar e Gravar na Cloud</>}
                                     </button>
                                     
                                     <div className="flex gap-4">
