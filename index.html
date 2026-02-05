@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HidroControl - Gestão de Produtividade</title>
+    <title>HidroControl - Gestão Industrial</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Chart.js para o Dashboard -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
@@ -44,7 +46,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
         .image-preview { object-fit: cover; width: 100%; height: 100%; border-radius: 1rem; }
-        .progress-bar { transition: width 1s ease-in-out; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 overflow-x-hidden">
@@ -53,16 +54,17 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // Ícones
+        // Icons
         const IconClipboard = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>;
         const IconSearch = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
         const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
         const IconSend = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
         const IconSave = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
-        const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+        const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
         const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
         const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
         const IconChart = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>;
+        const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
 
         const App = () => {
             const [view, setView] = useState('form'); 
@@ -72,12 +74,8 @@
             const [saveSuccess, setSaveSuccess] = useState(false);
             const [activeDropdownIndex, setActiveDropdownIndex] = useState(null);
             
-            // Estado principal: Informações Gerais + Lista de Equipamentos
-            const [globalInfo, setGlobalInfo] = useState({
-                data: new Date().toLocaleDateString('pt-BR'),
-                empresa: 'Montisol',
-                turno: 'ADM'
-            });
+            const chartPieRef = useRef(null);
+            const chartBarRef = useRef(null);
 
             const initialItemState = {
                 equipamento: '',
@@ -87,13 +85,18 @@
                 tubosComFerro: '',
                 impactos: '',
                 observacoes: '',
-                fotosAntes: [], // Array de base64/URLs
+                fotosAntes: [],
                 fotosDepois: []
             };
 
-            const [items, setItems] = useState([initialItemState]);
+            const [items, setItems] = useState([{ ...initialItemState }]);
+            const [globalInfo, setGlobalInfo] = useState({
+                data: new Date().toLocaleDateString('pt-BR'),
+                empresa: 'Montisol',
+                turno: 'ADM'
+            });
 
-            // Firebase Integration
+            // Firebase Auth & Data Sync
             useEffect(() => {
                 const initAuth = async () => {
                     if (!window.FirebaseSDK) return;
@@ -113,7 +116,7 @@
                             await signInAnonymously(auth);
                         }
                         onAuthStateChanged(auth, setUser);
-                    } catch (e) { console.error("Auth Init Error:", e); }
+                    } catch (e) { console.error("Erro Auth:", e); }
                 };
                 initAuth();
             }, []);
@@ -122,29 +125,77 @@
                 if (!user || !window.db) return;
                 const { collection, query, orderBy, limit, onSnapshot } = window.FirebaseSDK;
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
-                const q = query(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), orderBy('createdAt', 'desc'), limit(50));
+                const q = query(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), orderBy('createdAt', 'desc'), limit(100));
                 const unsubscribe = onSnapshot(q, (snapshot) => {
                     setHistoryData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                }, (err) => console.error("Firestore Sync Error:", err));
+                }, (err) => console.error("Erro Sync Firestore:", err));
                 return () => unsubscribe();
             }, [user]);
+
+            // Lógica de Gráficos (Dashboard)
+            useEffect(() => {
+                if (view === 'dashboard' && historyData.length > 0) {
+                    // Pizza: Status de Produção
+                    let tLimpos = 0, tObstruidos = 0, tFerro = 0;
+                    historyData.forEach(rel => {
+                        (rel.items || []).forEach(it => {
+                            tLimpos += (Number(it.tubosLimpos) || 0);
+                            tObstruidos += (Number(it.tubosObstruidos) || 0);
+                            tFerro += (Number(it.tubosComFerro) || 0);
+                        });
+                    });
+
+                    const ctxPie = document.getElementById('pieChart');
+                    if (ctxPie) {
+                        if (chartPieRef.current) chartPieRef.current.destroy();
+                        chartPieRef.current = new Chart(ctxPie, {
+                            type: 'doughnut',
+                            data: {
+                                labels: ['Limpos', 'Obstruídos', 'Com Ferro'],
+                                datasets: [{
+                                    data: [tLimpos, tObstruidos, tFerro],
+                                    backgroundColor: ['#22c55e', '#ef4444', '#eab308'],
+                                    borderWidth: 0
+                                }]
+                            },
+                            options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+                        });
+                    }
+
+                    // Barras: Produção por Turno
+                    const turnos = { 'ADM': 0, 'T.C': 0, 'T.A': 0 };
+                    historyData.forEach(rel => {
+                        const totalRel = (rel.items || []).reduce((acc, i) => acc + (Number(i.tubosLimpos) || 0), 0);
+                        turnos[rel.turno] = (turnos[rel.turno] || 0) + totalRel;
+                    });
+
+                    const ctxBar = document.getElementById('barChart');
+                    if (ctxBar) {
+                        if (chartBarRef.current) chartBarRef.current.destroy();
+                        chartBarRef.current = new Chart(ctxBar, {
+                            type: 'bar',
+                            data: {
+                                labels: ['ADM', 'T.C', 'T.A'],
+                                datasets: [{
+                                    label: 'Tubos Limpos',
+                                    data: Object.values(turnos),
+                                    backgroundColor: '#1e40af',
+                                    borderRadius: 10
+                                }]
+                            },
+                            options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+                        });
+                    }
+                }
+            }, [view, historyData]);
 
             const equipamentosLista = useMemo(() => [
                 '025A-TC-21A','025A-TC-21B','025A-TC-21C','025A-TC-21D','025A-TC-21E','025A-TC-21F',
                 '025A-TC-31A','025A-TC-31B','025A-TC-31C','025A-TC-31D','025A-TC-31E','025A-TC-31F',
                 '030-TC-001','030-TC-002','030-TC-003','030-TC-004','030-TC-005','030-TC-006','030-TC-007','030-TC-008','030-TC-009','030-TC-010',
-                '030-TC-22A','030-TC-22B','030-TC-22C','030-TC-22D','030-TC-23A','030-TC-23B','030-TC-24A','030-TC-24B',
-                '040-TC-011','042-TC-011','042-TC-039'
+                '030-TC-11A','030-TC-11B','030-TC-11C','030-TC-22A','030-TC-22B','030-TC-22C','030-TC-22D',
+                '040-TC-011','042-TC-011','042-TC-039','030-VA-16'
             ], []);
-
-            const addItem = () => setItems([...items, { ...initialItemState }]);
-            const removeItem = (index) => {
-                if (items.length > 1) {
-                    const newItems = [...items];
-                    newItems.splice(index, 1);
-                    setItems(newItems);
-                }
-            };
 
             const updateItem = (index, field, value) => {
                 const newItems = [...items];
@@ -155,7 +206,6 @@
             const handleFileChange = (e, index, type) => {
                 const files = Array.from(e.target.files);
                 const newPhotos = [];
-                
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onloadend = () => {
@@ -170,29 +220,6 @@
                 });
             };
 
-            const removePhoto = (itemIndex, type, photoIndex) => {
-                const updatedItems = [...items];
-                updatedItems[itemIndex][type].splice(photoIndex, 1);
-                setItems(updatedItems);
-            };
-
-            const stats = useMemo(() => {
-                // Simplificação do Dashboard para considerar a estrutura de itens
-                let totalLimpos = 0;
-                let totalFerro = 0;
-                const turnosCount = { 'ADM': 0, 'T.C': 0, 'T.A': 0 };
-
-                historyData.forEach(rel => {
-                    const relItems = Array.isArray(rel.items) ? rel.items : [];
-                    relItems.forEach(item => {
-                        totalLimpos += (Number(item.tubosLimpos) || 0);
-                        totalFerro += (Number(item.tubosComFerro) || 0);
-                    });
-                    turnosCount[rel.turno] = (turnosCount[rel.turno] || 0) + relItems.reduce((acc, i) => acc + (Number(i.tubosLimpos) || 0), 0);
-                });
-                return { totalLimpos, totalFerro, turnosCount };
-            }, [historyData]);
-
             const handleSaveToCloud = async () => {
                 setIsSaving(true);
                 if (window.db && user) {
@@ -203,46 +230,66 @@
                         await addDoc(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), {
                             ...globalInfo,
                             items: items.map(it => ({
-                                ...it,
+                                equipamento: it.equipamento,
                                 tubosLimpos: Number(it.tubosLimpos) || 0,
                                 tubosObstruidos: Number(it.tubosObstruidos) || 0,
                                 tubosComFerro: Number(it.tubosComFerro) || 0,
-                                fotosAntesCount: it.fotosAntes.length,
-                                fotosDepoisCount: it.fotosDepois.length,
-                                fotosAntes: [], // Não salvamos base64 no Firestore por limite de tamanho
-                                fotosDepois: []
+                                impactos: it.impactos,
+                                observacoes: it.observacoes,
+                                totalFotos: it.fotosAntes.length + it.fotosDepois.length
                             })),
                             userId: user.uid,
                             createdAt: serverTimestamp()
                         });
                         setSaveSuccess(true);
-                    } catch (e) { console.error("Save Error:", e); }
+                    } catch (e) { console.error("Erro Salvar Cloud:", e); }
                 } else { setSaveSuccess(true); }
                 setIsSaving(false);
             };
 
-            const handleSendWhatsApp = () => {
-                let msg = `*HIDROJATO - ${globalInfo.empresa.toUpperCase()}*%0A` +
-                          `*Turno:* ${globalInfo.turno}%0A` +
-                          `*Data:* ${globalInfo.data}%0A%0A`;
-
-                items.forEach((item, idx) => {
-                    msg += `*${idx + 1}. Equipamento:* ${item.equipamento}%0A` +
-                           `✅ Tubos Limpos: ${item.tubosLimpos}%0A` +
-                           `${item.tubosObstruidos ? `❌ Obstruídos: ${item.tubosObstruidos}%0A` : ''}` +
-                           `${item.tubosComFerro ? `⚠️ Com Ferro: ${item.tubosComFerro}%0A` : ''}` +
-                           `📸 Evidências: ${item.fotosAntes.length} Antes / ${item.fotosDepois.length} Depois%0A` +
-                           `${item.impactos ? `⚡ Impacto: ${item.impactos}%0A` : ''}` +
-                           `${item.observacoes ? `📝 Obs: ${item.observacoes}%0A` : ''}%0A`;
+            const handleExportCSV = () => {
+                let csvContent = "data:text/csv;charset=utf-8,Data,Empresa,Turno,TAG,Limpos,Obstruidos,Ferro,Impactos\n";
+                historyData.forEach(rel => {
+                    (rel.items || []).forEach(it => {
+                        const row = [
+                            rel.data,
+                            rel.empresa,
+                            rel.turno,
+                            it.equipamento,
+                            it.tubosLimpos,
+                            it.tubosObstruidos,
+                            it.tubosComFerro,
+                            `"${(it.impactos || '').replace(/"/g, '""')}"`
+                        ].join(",");
+                        csvContent += row + "\n";
+                    });
                 });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `hidrocontrol_export_${new Date().toISOString().slice(0,10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
 
-                msg += `_Relatório consolidado via HidroControl_`;
+            const handleSendWhatsApp = () => {
+                let msg = `*RELATÓRIO HIDROJATO - ${globalInfo.empresa.toUpperCase()}*%0A` +
+                          `📅 Data: ${globalInfo.data}%0A` +
+                          `🕒 Turno: ${globalInfo.turno}%0A%0A`;
+                items.forEach((it, idx) => {
+                    msg += `*${idx+1}. TAG: ${it.equipamento}*%0A` +
+                           `✅ Limpos: ${it.tubosLimpos || 0}%0A` +
+                           `❌ Obstruídos: ${it.tubosObstruidos || 0}%0A` +
+                           `⚠️ Ferro: ${it.tubosComFerro || 0}%0A` +
+                           `${it.impactos ? `⚡ Impacto: ${it.impactos}%0A` : ''}%0A`;
+                });
                 window.open(`https://wa.me/?text=${msg}`, '_blank');
                 resetForm();
             };
 
             const resetForm = () => {
-                setItems([initialItemState]);
+                setItems([{ ...initialItemState }]);
                 setSaveSuccess(false);
                 setView('form');
             };
@@ -252,65 +299,84 @@
                     <header className="bg-blue-800 text-white p-6 sticky top-0 z-40 shadow-xl flex items-center justify-between rounded-b-3xl">
                         <div className="flex items-center gap-3">
                             <IconClipboard />
-                            <h1 className="font-black text-xl tracking-tight leading-none uppercase">Hidro<span className="text-blue-300">Control</span></h1>
+                            <h1 className="font-black text-xl tracking-tight uppercase">Hidro<span className="text-blue-300">Control</span></h1>
                         </div>
-                        <div className="bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 text-[10px] font-black uppercase tracking-tighter">{globalInfo.data}</div>
+                        <div className="text-[10px] font-black bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 uppercase">
+                            {view === 'dashboard' ? 'Analytics' : globalInfo.data}
+                        </div>
                     </header>
 
                     <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-28">
                         {view === 'dashboard' ? (
-                            /* DASHBOARD VIEW */
+                            /* DASHBOARD FUNCIONAL */
                             <div className="animate-in fade-in duration-500 space-y-6">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Painel de Produtividade</h2>
+                                    <button onClick={handleExportCSV} className="flex items-center gap-1.5 text-[10px] font-black text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 uppercase">
+                                        <IconDownload /> Exportar Dados
+                                    </button>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center">
-                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Produção Acumulada</p>
-                                        <h4 className="text-3xl font-black text-blue-700">{stats.totalLimpos}</h4>
+                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Total Limpos</p>
+                                        <h4 className="text-3xl font-black text-blue-700">
+                                            {historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosLimpos) || 0), 0), 0)}
+                                        </h4>
                                     </div>
                                     <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center">
-                                        <p className="text-[10px] font-black uppercase text-red-400 mb-1 tracking-widest italic">Tubos c/ Ferro</p>
-                                        <h4 className="text-3xl font-black text-red-600">{stats.totalFerro}</h4>
+                                        <p className="text-[10px] font-black uppercase text-red-400 mb-1">Total Ferro</p>
+                                        <h4 className="text-3xl font-black text-red-600">
+                                            {historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosComFerro) || 0), 0), 0)}
+                                        </h4>
                                     </div>
                                 </div>
-                                <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
-                                    <h3 className="text-[10px] font-black uppercase text-slate-500 mb-6 tracking-widest text-center">Produção por Turno</h3>
-                                    <div className="space-y-5">
-                                        {Object.entries(stats.turnosCount).map(([turno, count]) => {
-                                            const percentage = stats.totalLimpos > 0 ? (count / stats.totalLimpos) * 100 : 0;
-                                            return (
-                                                <div key={turno} className="space-y-1">
-                                                    <div className="flex justify-between text-[10px] font-black uppercase text-slate-400"><span>Turno {turno}</span><span>{count}</span></div>
-                                                    <div className="h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                                                        <div className="h-full bg-blue-600 progress-bar" style={{ width: `${percentage}%` }}></div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+
+                                <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
+                                    <div className="text-center space-y-1">
+                                        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Status Geral dos Tubos</h3>
+                                        <div className="w-full max-w-[200px] mx-auto pt-4"><canvas id="pieChart"></canvas></div>
                                     </div>
+                                    <div className="pt-6 border-t border-slate-50 space-y-1">
+                                        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-center mb-4">Produção Acumulada por Turno</h3>
+                                        <canvas id="barChart" height="150"></canvas>
+                                    </div>
+                                </div>
+
+                                <section className="space-y-3">
+                                    <h3 className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Histórico Recente</h3>
+                                    {historyData.slice(0, 8).map((rel, rIdx) => (
+                                        <div key={rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between">
+                                            <div>
+                                                <p className="text-xs font-black text-slate-700">{rel.data} - Turno {rel.turno}</p>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{rel.items?.length} Equipamentos • {(rel.items || []).reduce((a, i) => a + (Number(i.tubosLimpos) || 0), 0)} tubos</p>
+                                            </div>
+                                            <div className="text-blue-700 font-black text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md">{rel.empresa}</div>
+                                        </div>
+                                    ))}
                                 </section>
                             </div>
                         ) : view === 'form' ? (
-                            /* FORM VIEW */
+                            /* FORMULÁRIO COM MÚLTIPLOS TAGS */
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
-                                {/* Informações Globais */}
                                 <section className="space-y-4">
                                     <div className="grid grid-cols-2 gap-3">
                                         {['Montisol', 'Constec'].map(e => (
-                                            <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>
+                                            <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>
                                         ))}
                                     </div>
                                     <div className="grid grid-cols-3 gap-3">
                                         {['ADM', 'T.C', 'T.A'].map(t => (
-                                            <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>
+                                            <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>
                                         ))}
                                     </div>
                                 </section>
 
-                                {/* Lista Dinâmica de Equipamentos */}
-                                <div className="space-y-8">
+                                <div className="space-y-10">
                                     {items.map((item, idx) => (
-                                        <div key={idx} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6 relative animate-in zoom-in-95 duration-200">
+                                        <div key={idx} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6 relative border-t-4 border-t-blue-500">
                                             {items.length > 1 && (
-                                                <button onClick={() => removeItem(idx)} className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full shadow-lg"><IconTrash /></button>
+                                                <button onClick={() => { const n = [...items]; n.splice(idx, 1); setItems(n); }} className="absolute -top-4 -right-4 bg-red-500 text-white p-2.5 rounded-full shadow-xl"><IconTrash /></button>
                                             )}
                                             
                                             <div className="relative">
@@ -341,67 +407,45 @@
                                                 <div className="space-y-1"><label className="text-[9px] font-black text-red-500 block uppercase text-center tracking-tighter italic">C/ Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-black text-lg text-red-600 focus:ring-2 focus:ring-red-500" /></div>
                                             </div>
 
-                                            {/* Galeria de Fotos */}
-                                            <div className="space-y-4">
-                                                <p className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Evidências do Equipamento</p>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {/* Antes */}
-                                                    <div className="space-y-2">
-                                                        <input type="file" multiple accept="image/*" className="hidden" id={`antes-${idx}`} onChange={(e) => handleFileChange(e, idx, 'fotosAntes')} />
-                                                        <label htmlFor={`antes-${idx}`} className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all">
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {['fotosAntes', 'fotosDepois'].map(type => (
+                                                    <div key={type} className="space-y-2">
+                                                        <input type="file" multiple accept="image/*" className="hidden" id={`${type}-${idx}`} onChange={(e) => handleFileChange(e, idx, type)} />
+                                                        <label htmlFor={`${type}-${idx}`} className="flex flex-col items-center justify-center p-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all">
                                                             <IconCamera />
-                                                            <span className="text-[9px] font-black uppercase mt-1">Fotos Antes</span>
+                                                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">{type.includes('Antes') ? 'Fotos Antes' : 'Fotos Depois'}</span>
                                                         </label>
-                                                        <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto pr-1">
-                                                            {item.fotosAntes.map((pic, pIdx) => (
-                                                                <div key={pIdx} className="relative aspect-square">
+                                                        <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
+                                                            {item[type].map((pic, pIdx) => (
+                                                                <div key={pIdx} className="relative aspect-square border border-slate-100 rounded-xl overflow-hidden">
                                                                     <img src={pic} className="image-preview w-full h-full" />
-                                                                    <button onClick={() => removePhoto(idx, 'fotosAntes', pIdx)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><IconX /></button>
+                                                                    <button onClick={() => { const n = [...items]; n[idx][type].splice(pIdx,1); setItems(n); }} className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full p-0.5 scale-75 shadow-md"><IconX /></button>
                                                                 </div>
                                                             ))}
                                                         </div>
                                                     </div>
-                                                    {/* Depois */}
-                                                    <div className="space-y-2">
-                                                        <input type="file" multiple accept="image/*" className="hidden" id={`depois-${idx}`} onChange={(e) => handleFileChange(e, idx, 'fotosDepois')} />
-                                                        <label htmlFor={`depois-${idx}`} className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all">
-                                                            <IconCamera />
-                                                            <span className="text-[9px] font-black uppercase mt-1">Fotos Depois</span>
-                                                        </label>
-                                                        <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto pr-1">
-                                                            {item.fotosDepois.map((pic, pIdx) => (
-                                                                <div key={pIdx} className="relative aspect-square">
-                                                                    <img src={pic} className="image-preview w-full h-full" />
-                                                                    <button onClick={() => removePhoto(idx, 'fotosDepois', pIdx)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><IconX /></button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                ))}
                                             </div>
 
-                                            <div className="space-y-3">
-                                                <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Impactos (Ex: atrasos, bloqueios)..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
-                                                <textarea value={item.observacoes} onChange={(e) => updateItem(idx, 'observacoes', e.target.value)} placeholder="Observações adicionais..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
-                                            </div>
+                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva impactos ou dificuldades..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
                                         </div>
                                     ))}
                                 </div>
 
-                                <button onClick={addItem} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-blue-50 transition-all">
-                                    <IconPlus /> Adicionar Novo Equipamento
+                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-blue-100 transition-all">
+                                    <IconPlus /> Adicionar Equipamento
                                 </button>
 
-                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all mt-4 disabled:opacity-30">Revisar Relatório Consolidado</button>
+                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all mt-6 disabled:opacity-30">Revisar Relatório Completo</button>
                             </div>
                         ) : (
-                            /* REVISÃO & AÇÕES */
+                            /* TELA DE REVISÃO */
                             <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6 pt-2 text-sm">
                                 <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800 space-y-6">
                                     <div className="flex justify-between items-start border-b border-slate-800 pb-4">
                                         <div className="space-y-1">
-                                            <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo de Atividade</h2>
-                                            <p className="text-slate-500 text-[10px] font-bold uppercase">{globalInfo.data} • Turno {globalInfo.turno}</p>
+                                            <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo Consolidado</h2>
+                                            <p className="text-slate-500 text-[10px] font-bold uppercase">{globalInfo.data} • {globalInfo.turno}</p>
                                         </div>
                                         <span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full">{globalInfo.empresa}</span>
                                     </div>
@@ -409,12 +453,10 @@
                                     <div className="space-y-6">
                                         {items.map((it, i) => (
                                             <div key={i} className="font-mono text-xs border-b border-slate-800/50 pb-4 last:border-none">
-                                                <p className="text-blue-300 font-black mb-2 uppercase">{i+1}. {it.equipamento}</p>
-                                                <div className="grid grid-cols-2 gap-y-1 pl-4">
-                                                    <span className="text-slate-500">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos}</span>
-                                                    {it.tubosObstruidos > 0 && <><span className="text-slate-500">Obstruídos:</span> <span className="text-red-400 font-bold">{it.tubosObstruidos}</span></>}
-                                                    {it.tubosComFerro > 0 && <><span className="text-slate-500">Com Ferro:</span> <span className="text-yellow-400 font-bold italic">{it.tubosComFerro}</span></>}
-                                                    <span className="text-slate-500">Fotos:</span> <span className="text-slate-300 italic">{it.fotosAntes.length}A / {it.fotosDepois.length}D</span>
+                                                <p className="text-blue-300 font-black mb-2 uppercase">{i+1}. TAG: {it.equipamento}</p>
+                                                <div className="grid grid-cols-2 gap-y-1.5 pl-3">
+                                                    <span className="text-slate-500">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span>
+                                                    <span className="text-slate-500">Status:</span> <span className="text-slate-300 italic">{it.fotosAntes.length}A / {it.fotosDepois.length}D Fotos</span>
                                                 </div>
                                             </div>
                                         ))}
@@ -422,21 +464,22 @@
                                 </div>
 
                                 {saveSuccess ? (
-                                    <div className="bg-green-50 border border-green-200 p-6 rounded-[2.5rem] text-center space-y-4 animate-bounce">
-                                        <p className="text-green-800 font-black uppercase text-xs tracking-widest">✅ Registro Consolidado com Sucesso!</p>
-                                        <div className="flex gap-3">
-                                            <button onClick={handleSendWhatsApp} className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black uppercase text-[10px] flex items-center justify-center gap-2"><IconSend /> Enviar WhatsApp</button>
-                                            <button onClick={resetForm} className="flex-1 bg-slate-800 text-white py-4 rounded-2xl font-black uppercase text-[10px]">Novo Relatório</button>
+                                    <div className="bg-green-50 border-2 border-green-200 p-8 rounded-[3rem] text-center space-y-4 shadow-xl">
+                                        <div className="bg-green-500 text-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2"><IconCheck /></div>
+                                        <p className="text-green-800 font-black uppercase text-xs tracking-widest">✅ Relatório Registrado!</p>
+                                        <div className="flex flex-col gap-3">
+                                            <button onClick={handleSendWhatsApp} className="bg-green-600 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-green-100"><IconSend /> Notificar via WhatsApp</button>
+                                            <button onClick={resetForm} className="bg-slate-800 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest">Novo Registro</button>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-3">
-                                        <button onClick={handleSaveToCloud} disabled={isSaving} className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50">
-                                            {isSaving ? 'Processando...' : <><IconSave /> Registrar Tudo na Cloud</>}
+                                        <button onClick={handleSaveToCloud} disabled={isSaving} className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50">
+                                            {isSaving ? 'Gravando dados...' : <><IconSave /> Registrar Informações na Nuvem</>}
                                         </button>
                                         <div className="flex gap-4">
                                             <button onClick={() => setView('form')} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400">Editar</button>
-                                            <button onClick={handleSendWhatsApp} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg shadow-green-100"><IconSend /> Enviar WhatsApp</button>
+                                            <button onClick={handleSendWhatsApp} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg"><IconSend /> Pular para WhatsApp</button>
                                         </div>
                                     </div>
                                 )}
@@ -444,19 +487,14 @@
                         )}
                     </main>
 
-                    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white/90 backdrop-blur-xl border-t border-slate-100 px-10 py-5 flex justify-around items-center z-40 rounded-t-[2.5rem] shadow-[0_-10px_30px_rgba(0,0,0,0.03)]">
+                    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white/90 backdrop-blur-xl border-t border-slate-100 px-14 py-5 flex justify-around items-center z-40 rounded-t-[3rem] shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
                         <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view === 'form' || view === 'preview' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
                             <IconClipboard />
-                            <span className="text-[8px] font-black uppercase mt-1 tracking-tighter">Relatório</span>
+                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">Relatório</span>
                         </button>
-                        <div className="relative -mt-12">
-                            <div className="w-14 h-14 rounded-full bg-blue-800 text-white flex items-center justify-center border-4 border-slate-50 shadow-xl shadow-blue-200 active:scale-90 transition-all">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                            </div>
-                        </div>
                         <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
                             <IconChart />
-                            <span className="text-[8px] font-black uppercase mt-1 tracking-tighter font-bold">Dashboard</span>
+                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">Dashboard</span>
                         </button>
                     </nav>
                 </div>
