@@ -62,7 +62,9 @@
             
             const chartPieRef = useRef(null);
             const chartBarRef = useRef(null);
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-v2';
+            
+            // Constante de Identificação do Aplicativo (Unificar caminhos na nuvem)
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-alumar-v1-prod';
 
             const initialItemState = {
                 equipamento: '',
@@ -84,17 +86,16 @@
             // --- Regra 3: Autenticação Resiliente ---
             useEffect(() => {
                 const initialize = async () => {
-                    // Espera pelo SDK sem travar
                     let count = 0;
                     while (!window.FB_CORE && count < 30) {
                         await new Promise(r => setTimeout(r, 100));
                         count++;
                     }
 
-                    const localUser = { uid: 'u-' + Math.random().toString(36).substr(2, 5), isLocal: true };
+                    const localIdentity = { uid: 'u-' + Math.random().toString(36).substr(2, 5), isLocal: true };
                     
                     if (!window.FB_CORE) {
-                        setUser(localUser);
+                        setUser(localIdentity);
                         return;
                     }
 
@@ -102,7 +103,7 @@
                     
                     try {
                         const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-                        if (!configStr) { setUser(localUser); return; }
+                        if (!configStr) { setUser(localIdentity); return; }
 
                         const config = JSON.parse(configStr);
                         const app = initializeApp(config);
@@ -118,46 +119,71 @@
 
                         onAuthStateChanged(auth, (u) => {
                             if (u) setUser(u);
-                            else setUser(localUser);
+                            else setUser(localIdentity);
                         });
                     } catch (e) {
-                        setUser(localUser);
+                        setUser(localIdentity);
                     }
                 };
                 initialize();
             }, []);
 
-            // --- Sincronização em Tempo Real (Regra 1 e 2) ---
+            // --- Regra 1 e 2: Sincronização em Tempo Real ---
             useEffect(() => {
                 if (!user || !db || !window.FB_CORE) return;
                 const { collection, onSnapshot } = window.FB_CORE;
                 
+                // Caminho estrito para os dados públicos do artefato
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'relatorios');
                 
                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // Ordenação manual para evitar índices complexos
-                    data.sort((a, b) => (b.localTimestamp || 0) - (a.localTimestamp || 0));
+                    const data = snapshot.docs.map(doc => ({ 
+                        id: doc.id, 
+                        ...doc.data() 
+                    }));
+                    
+                    // Ordenação manual para evitar erro de indexação no Firestore (Regra 2)
+                    data.sort((a, b) => {
+                        const timeA = a.createdAt?.seconds || a.localTimestamp || 0;
+                        const timeB = b.createdAt?.seconds || b.localTimestamp || 0;
+                        return timeB - timeA;
+                    });
+                    
                     setHistoryData(data);
-                }, (err) => console.warn("Modo Offline Ativo"));
+                }, (err) => console.warn("Modo Offline Ativo ou Erro de Permissão."));
                 
                 return () => unsubscribe();
             }, [user, db]);
 
-            // --- Dashboard ---
+            // --- Cálculos de Produção ---
+            const stats = useMemo(() => {
+                let limpos = 0;
+                let ferro = 0;
+                const turnosMap = { 'ADM': 0, 'T.C': 0, 'T.A': 0 };
+
+                historyData.forEach(rel => {
+                    const relItems = Array.isArray(rel.items) ? rel.items : [];
+                    relItems.forEach(it => {
+                        const l = Number(it.tubosLimpos) || 0;
+                        limpos += l;
+                        ferro += (Number(it.tubosComFerro) || 0);
+                        if (turnosMap[rel.turno] !== undefined) turnosMap[rel.turno] += l;
+                    });
+                });
+
+                return { limpos, ferro, turnosMap };
+            }, [historyData]);
+
+            // --- Gráficos do Dashboard ---
             useEffect(() => {
                 if (view === 'dashboard' && historyData.length > 0) {
                     const timer = setTimeout(() => {
                         let tLimpos = 0, tObstruidos = 0, tFerro = 0;
-                        const turnos = { 'ADM': 0, 'T.C': 0, 'T.A': 0 };
-
                         historyData.forEach(rel => {
                             (rel.items || []).forEach(it => {
-                                const l = Number(it.tubosLimpos) || 0;
-                                tLimpos += l;
+                                tLimpos += (Number(it.tubosLimpos) || 0);
                                 tObstruidos += (Number(it.tubosObstruidos) || 0);
                                 tFerro += (Number(it.tubosComFerro) || 0);
-                                if (turnos[rel.turno] !== undefined) turnos[rel.turno] += l;
                             });
                         });
 
@@ -170,7 +196,7 @@
                                     labels: ['Limpos', 'Obstruídos', 'Com Ferro'],
                                     datasets: [{ data: [tLimpos, tObstruidos, tFerro], backgroundColor: ['#22c55e', '#ef4444', '#f59e0b'], borderWidth: 0 }]
                                 },
-                                options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+                                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, weight: 'bold' } } } } }
                             });
                         }
 
@@ -181,15 +207,25 @@
                                 type: 'bar',
                                 data: {
                                     labels: ['ADM', 'T.C', 'T.A'],
-                                    datasets: [{ label: 'Tubos', data: [turnos['ADM'], turnos['T.C'], turnos['T.A']], backgroundColor: '#1e40af', borderRadius: 6 }]
+                                    datasets: [{
+                                        label: 'Tubos',
+                                        data: [stats.turnosMap['ADM'], stats.turnosMap['T.C'], stats.turnosMap['T.A']],
+                                        backgroundColor: '#1e40af',
+                                        borderRadius: 6
+                                    }]
                                 },
-                                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+                                options: { 
+                                    responsive: true, 
+                                    maintainAspectRatio: false, 
+                                    scales: { y: { beginAtZero: true, ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 10, weight: 'bold' } } } }, 
+                                    plugins: { legend: { display: false } } 
+                                }
                             });
                         }
                     }, 400);
                     return () => clearTimeout(timer);
                 }
-            }, [view, historyData]);
+            }, [view, historyData, stats]);
 
             const equipamentosLista = [
                 '025A-TC-21A','025A-TC-21B','025A-TC-21C','025A-TC-21D','025A-TC-21E','025A-TC-21F',
@@ -248,7 +284,7 @@
                         setSaveSuccess(false);
                         setItems([{ ...initialItemState }]); 
                         setView('dashboard');
-                    }, 2500);
+                    }, 3000);
 
                 } catch (e) { 
                     setSaveSuccess(true);
@@ -260,7 +296,7 @@
 
             const handleExportCSV = () => {
                 if (historyData.length === 0) return;
-                let rows = ["Data,Empresa,Turno,TAG,Limpos,Obstruidos,Ferro,Impactos"];
+                let rows = ["Data,Empresa,Turno,TAG,Limpos,Obstruídos,Ferro,Impactos"];
                 historyData.forEach(rel => {
                     (rel.items || []).forEach(it => {
                         rows.push([rel.data, rel.empresa, rel.turno, it.equipamento, it.tubosLimpos, it.tubosObstruidos, it.tubosComFerro, `"${it.impactos}"`].join(","));
@@ -269,7 +305,7 @@
                 const blob = new Blob([rows.join("\n")], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
-                link.download = `relatorio_acumulado.csv`;
+                link.download = `hidrocontrol_acumulado_${new Date().toISOString().split('T')[0]}.csv`;
                 link.click();
             };
 
@@ -286,108 +322,196 @@
                     <header className="bg-blue-800 text-white p-6 sticky top-0 z-40 shadow-lg flex items-center justify-between rounded-b-3xl">
                         <div className="flex items-center gap-3">
                             <IconClipboard />
-                            <h1 className="font-bold text-xl tracking-tight uppercase">HidroControl</h1>
+                            <h1 className="font-bold text-xl tracking-tight uppercase tracking-tighter">Hidro<span className="text-blue-300">Control</span></h1>
                         </div>
-                        <div className="text-[10px] font-black bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 uppercase">
+                        <div className="text-[10px] font-black bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 uppercase tracking-tighter">
                             {view === 'dashboard' ? 'Analytics' : globalInfo.data}
                         </div>
                     </header>
 
                     <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-28">
                         {view === 'dashboard' ? (
+                            /* --- DASHBOARD --- */
                             <div className="animate-in fade-in duration-500 space-y-6">
                                 <div className="flex justify-between items-center">
-                                    <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Painel Acumulado</h2>
-                                    <button onClick={handleExportCSV} className="text-[10px] font-black text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 uppercase">Exportar Excel</button>
+                                    <div className="flex flex-col">
+                                        <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Dados Sincronizados</h2>
+                                        <span className="text-[9px] font-bold text-blue-600 uppercase mt-1 tracking-tighter">{historyData.length} relatórios na nuvem</span>
+                                    </div>
+                                    <button onClick={handleExportCSV} disabled={historyData.length === 0} className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-lg border uppercase transition-all ${historyData.length > 0 ? 'text-blue-700 bg-blue-50 border-blue-100 hover:bg-blue-100 shadow-sm' : 'text-slate-300 opacity-50'}`}><IconDownload /> Excel</button>
                                 </div>
+
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center card-shadow">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase">Limpos</p>
-                                        <h4 className="text-3xl font-black text-blue-700">{historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosLimpos) || 0), 0), 0)}</h4>
+                                    <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center card-shadow transition-all hover:shadow-md">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Limpos Total</p>
+                                        <h4 className="text-3xl font-black text-blue-700 mt-2">{stats.limpos}</h4>
                                     </div>
-                                    <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center card-shadow">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase">Ferro</p>
-                                        <h4 className="text-3xl font-black text-red-600">{historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosComFerro) || 0), 0), 0)}</h4>
+                                    <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center card-shadow transition-all hover:shadow-md">
+                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Ferro Total</p>
+                                        <h4 className="text-3xl font-black text-red-600 mt-2">{stats.ferro}</h4>
                                     </div>
                                 </div>
+
                                 <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-8 card-shadow">
-                                    <div className="text-center"><h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Qualidade</h3><div className="w-full h-[180px] relative"><canvas id="pieChart"></canvas></div></div>
-                                    <div className="pt-6 border-t border-slate-50 text-center"><h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Turnos</h3><div className="w-full h-[140px] relative"><canvas id="barChart"></canvas></div></div>
+                                    <div className="text-center">
+                                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Qualidade Industrial</h3>
+                                        <div className="w-full h-[180px] relative"><canvas id="pieChart"></canvas></div>
+                                    </div>
+                                    <div className="pt-6 border-t border-slate-50 text-center">
+                                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Produção por Turno</h3>
+                                        <div className="w-full h-[140px] relative"><canvas id="barChart"></canvas></div>
+                                    </div>
                                 </div>
+
                                 <section className="space-y-3">
-                                    <h3 className="text-[10px] font-bold text-slate-400 uppercase text-center tracking-widest">Logs de Produção</h3>
-                                    {historyData.slice(0, 10).map((rel, rIdx) => (
-                                        <div key={rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm animate-in slide-in-from-left">
-                                            <div><p className="text-xs font-bold text-slate-700">{rel.data} - {rel.turno}</p><p className="text-[9px] text-slate-400 font-bold uppercase">{(rel.items || []).length} TAGs arquivadas</p></div>
-                                            <div className="text-blue-700 font-bold text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md">{rel.empresa}</div>
+                                    <h3 className="text-[10px] font-black text-slate-400 uppercase text-center tracking-widest">Logs de Produção Recentes</h3>
+                                    {historyData.slice(0, 15).map((rel, rIdx) => (
+                                        <div key={rel.id || rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm animate-in slide-in-from-left">
+                                            <div className="flex flex-col">
+                                                <p className="text-xs font-black text-slate-700">{rel.data} - {rel.turno}</p>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{(rel.items || []).length} Equipamentos arquivados</p>
+                                            </div>
+                                            <div className="text-blue-700 font-bold text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md border border-blue-100 leading-none">{rel.empresa}</div>
                                         </div>
                                     ))}
+                                    {historyData.length === 0 && <div className="text-center py-10 opacity-40 italic text-[10px] uppercase tracking-widest">Sincronizando com a Cloud...</div>}
                                 </section>
                             </div>
                         ) : view === 'form' ? (
+                            /* --- FORMULÁRIO --- */
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
-                                <section className="grid grid-cols-2 gap-3">{['Montisol', 'Constec'].map(e => (<button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-bold text-xs transition-all border ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>))}</section>
-                                <section className="grid grid-cols-3 gap-3">{['ADM', 'T.C', 'T.A'].map(t => (<button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-bold text-xs transition-all border ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>))}</section>
+                                <section className="grid grid-cols-2 gap-3">
+                                    {['Montisol', 'Constec'].map(e => (
+                                        <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-bold text-xs transition-all border ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>
+                                    ))}
+                                </section>
+                                <section className="grid grid-cols-3 gap-3">
+                                    {['ADM', 'T.C', 'T.A'].map(t => (
+                                        <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-bold text-xs transition-all border ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>
+                                    ))}
+                                </section>
+
                                 <div className="space-y-8">
                                     {items.map((item, idx) => (
                                         <div key={idx} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-6 relative card-shadow border-t-4 border-t-blue-500">
                                             {items.length > 1 && (<button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="absolute -top-4 -right-4 bg-red-500 text-white p-2.5 rounded-full shadow-xl"><IconTrash /></button>)}
-                                            <div className="relative"><label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">TAG do Equipamento</label><input type="text" placeholder="Pesquisar..." value={item.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm" />
-                                                {activeDropdownIndex === idx && (<div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">{equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (<div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-bold text-sm text-slate-700 cursor-pointer">{tag}</div>))}</div>)}
+                                            
+                                            <div className="relative">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">TAG do Equipamento</label>
+                                                <input type="text" placeholder="Pesquisar..." value={item.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm" />
+                                                {activeDropdownIndex === idx && (
+                                                    <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">
+                                                        {equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (
+                                                            <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer tracking-tighter">{tag}</div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
+
                                             <div className="grid grid-cols-3 gap-3">
-                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block">Limpos</label><input type="number" value={item.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg" /></div>
-                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block">Obs.</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg" /></div>
-                                                <div className="space-y-1"><label className="text-[9px] font-bold text-red-500 uppercase text-center block">Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-bold text-lg text-red-600" /></div>
+                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block leading-none">Limpos</label><input type="number" value={item.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg focus:ring-2 focus:ring-blue-500 transition-all" /></div>
+                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block leading-none">Obs.</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg focus:ring-2 focus:ring-blue-500 transition-all" /></div>
+                                                <div className="space-y-1"><label className="text-[9px] font-bold text-red-500 uppercase text-center block font-black leading-none">Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-bold text-lg text-red-600 focus:ring-2 focus:ring-red-500 transition-all" /></div>
                                             </div>
+
                                             <div className="grid grid-cols-2 gap-4">
                                                 {['fotosAntes', 'fotosDepois'].map(type => (
-                                                    <div key={type} className="space-y-2"><input type="file" multiple accept="image/*" className="hidden" id={`${type}-${idx}`} onChange={(e) => handleFileChange(e, idx, type)} /><label htmlFor={`${type}-${idx}`} className="flex flex-col items-center justify-center p-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer"><IconCamera /><span className="text-[9px] font-bold uppercase mt-1">{type === 'fotosAntes' ? 'Antes' : 'Depois'}</span></label><div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">{(item[type] || []).map((pic, pIdx) => (<div key={pIdx} className="relative aspect-square border border-slate-100 rounded-xl overflow-hidden shadow-sm"><img src={pic} className="image-preview" /><button onClick={() => { const n = [...items]; n[idx][type].splice(pIdx,1); setItems(n); }} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 scale-75 shadow-md"><IconX /></button></div>))}</div></div>
+                                                    <div key={type} className="space-y-2">
+                                                        <input type="file" multiple accept="image/*" className="hidden" id={`${type}-${idx}`} onChange={(e) => handleFileChange(e, idx, type)} />
+                                                        <label htmlFor={`${type}-${idx}`} className="flex flex-col items-center justify-center p-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all shadow-sm">
+                                                            <IconCamera />
+                                                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">{type === 'fotosAntes' ? 'Antes' : 'Depois'}</span>
+                                                        </label>
+                                                        <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">
+                                                            {(item[type] || []).map((pic, pIdx) => (
+                                                                <div key={pIdx} className="relative aspect-square border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                                                                    <img src={pic} className="image-preview" />
+                                                                    <button onClick={() => { 
+                                                                        const n = [...items]; 
+                                                                        n[idx][type].splice(pIdx,1); 
+                                                                        setItems(n); 
+                                                                    }} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 scale-75 shadow-md transition-transform hover:scale-90"><IconX /></button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                 ))}
                                             </div>
+                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva dificuldades identificadas..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
                                         </div>
                                     ))}
                                 </div>
-                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-bold uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all"><IconPlus /> Novo Equipamento</button>
-                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-bold uppercase tracking-[0.15em] text-xs shadow-2xl active:scale-95 transition-all disabled:opacity-30">Revisar Relatório</button>
+                                
+                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all leading-none"><IconPlus /> Novo Equipamento</button>
+                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.15em] text-xs shadow-2xl active:scale-95 transition-all disabled:opacity-30 leading-none">Revisar Relatório</button>
                             </div>
                         ) : (
                             /* --- PREVIEW --- */
                             <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6 pt-2 text-sm relative">
                                 {saveSuccess && (
                                     <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6">
-                                        <div className="bg-white p-10 rounded-[3rem] text-center space-y-4 shadow-2xl">
-                                            <div className="bg-green-500 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl"><IconCheck /></div>
-                                            <div><h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Registo Guardado!</h3><p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2">Sincronizando Dashboard...</p></div>
+                                        <div className="bg-white p-10 rounded-[3rem] text-center space-y-4 shadow-2xl border border-blue-100 scale-110">
+                                            <div className="bg-green-500 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl scale-110"><IconCheck /></div>
+                                            <div>
+                                                <h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Registo Guardado!</h3>
+                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 leading-tight">O histórico industrial foi atualizado.<br/>Sincronizando Dashboard...</p>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
-                                <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800 space-y-6">
-                                    <div className="flex justify-between items-start border-b border-slate-800 pb-4 leading-none"><div className="space-y-1"><h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest">Resumo Consolidado</h2><p className="text-slate-500 text-[10px] font-bold uppercase tracking-tighter">{globalInfo.data} • Turno {globalInfo.turno}</p></div><span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full border border-blue-400/30 leading-none">{globalInfo.empresa}</span></div>
+                                
+                                <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800 space-y-6 leading-none">
+                                    <div className="flex justify-between items-start border-b border-slate-800 pb-4">
+                                        <div className="space-y-1">
+                                            <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo Consolidado</h2>
+                                            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-tighter">{globalInfo.data} • Turno {globalInfo.turno}</p>
+                                        </div>
+                                        <span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full border border-blue-400/30 leading-none">{globalInfo.empresa}</span>
+                                    </div>
+                                    
                                     <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 hide-scroll">
-                                        {(items || []).map((it, i) => (
+                                        {Array.isArray(items) && items.map((it, i) => (
                                             <div key={i} className="font-mono text-xs border-b border-slate-800/50 pb-4 last:border-none">
-                                                <p className="text-blue-300 font-black mb-2 uppercase tracking-tighter">{i+1}. TAG: {it.equipamento}</p>
+                                                <p className="text-blue-300 font-black mb-3 uppercase tracking-tighter">{i+1}. TAG: {it.equipamento}</p>
                                                 <div className="grid grid-cols-2 gap-y-1.5 pl-3">
-                                                    <span className="text-slate-500 italic uppercase text-[9px] leading-none">Limpos:</span> <span className="text-green-400 font-bold leading-none">{it.tubosLimpos || 0}</span>
-                                                    <span className="text-slate-500 italic uppercase text-[9px] leading-none">Ficheiros:</span> <span className="text-slate-300 leading-none">{(it.fotosAntes || []).length + (it.fotosDepois || []).length} total</span>
+                                                    <span className="text-slate-500 italic uppercase text-[9px]">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span>
+                                                    <span className="text-slate-500 italic uppercase text-[9px]">Fotos:</span> <span className="text-slate-300">{(it.fotosAntes || []).length + (it.fotosDepois || []).length} arquivos</span>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
+                                
                                 <div className="flex flex-col gap-3 pb-8">
-                                    <button onClick={handleSaveToCloud} disabled={isSaving || saveSuccess || !user} className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50">{isSaving ? 'Gravando...' : <><IconSave /> Confirmar e Gravar na Cloud</>}</button>
-                                    <div className="flex gap-4"><button onClick={() => setView('form')} disabled={saveSuccess} className="flex-1 bg-white py-5 rounded-[2.5rem] font-bold uppercase text-[10px] border border-slate-200 text-slate-400 transition-all hover:bg-slate-50">Editar</button><button onClick={handleSendWhatsApp} disabled={saveSuccess} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-bold uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg transition-all hover:bg-green-600"><IconSend /> WhatsApp</button></div>
-                                    {!user && <p className="text-center text-[9px] text-red-400 font-bold uppercase animate-pulse mt-2">Aguardando nuvem...</p>}
+                                    <button 
+                                        onClick={handleSaveToCloud} 
+                                        disabled={isSaving || saveSuccess || !user} 
+                                        className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50 leading-none"
+                                    >
+                                        {isSaving ? 'Gravando...' : <><IconSave /> Confirmar e Gravar na Cloud</>}
+                                    </button>
+                                    
+                                    <div className="flex gap-4">
+                                        <button onClick={() => setView('form')} disabled={saveSuccess} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400 shadow-sm transition-all hover:bg-slate-50 leading-none">Editar</button>
+                                        <button onClick={handleSendWhatsApp} disabled={saveSuccess} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg transition-all hover:bg-green-600 leading-none">
+                                            <IconSend /> Partilhar no WhatsApp
+                                        </button>
+                                    </div>
+                                    {!user && <p className="text-center text-[9px] text-red-400 font-black uppercase animate-pulse mt-2 tracking-widest leading-none">A aguardar ligação estável com a nuvem...</p>}
                                 </div>
                             </div>
                         )}
                     </main>
 
                     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white/95 backdrop-blur-md border-t border-slate-100 px-14 py-5 flex justify-around items-center z-40 rounded-t-[3rem] shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view !== 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}><IconClipboard /><span className="text-[9px] font-bold uppercase mt-1 tracking-tighter">Relatório</span></button>
-                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}><IconChart /><span className="text-[9px] font-bold uppercase mt-1 tracking-tighter">Dashboard</span></button>
+                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view !== 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
+                            <IconClipboard />
+                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter font-bold leading-none">Relatório</span>
+                        </button>
+                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
+                            <IconChart />
+                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter font-bold leading-none">Dashboard</span>
+                        </button>
                     </nav>
                 </div>
             );
