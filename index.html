@@ -54,7 +54,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // Icons
+        // Ícones
         const IconClipboard = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>;
         const IconSearch = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
         const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
@@ -96,7 +96,7 @@
                 turno: 'ADM'
             });
 
-            // Firebase Auth & Data Sync
+            // Firebase Auth
             useEffect(() => {
                 const initAuth = async () => {
                     if (!window.FirebaseSDK) return;
@@ -121,71 +121,76 @@
                 initAuth();
             }, []);
 
+            // Data Sync
             useEffect(() => {
                 if (!user || !window.db) return;
                 const { collection, query, orderBy, limit, onSnapshot } = window.FirebaseSDK;
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
                 const q = query(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), orderBy('createdAt', 'desc'), limit(100));
                 const unsubscribe = onSnapshot(q, (snapshot) => {
-                    setHistoryData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setHistoryData(data);
                 }, (err) => console.error("Erro Sync Firestore:", err));
                 return () => unsubscribe();
             }, [user]);
 
-            // Lógica de Gráficos (Dashboard)
+            // Charts Logic
             useEffect(() => {
                 if (view === 'dashboard' && historyData.length > 0) {
-                    // Pizza: Status de Produção
-                    let tLimpos = 0, tObstruidos = 0, tFerro = 0;
-                    historyData.forEach(rel => {
-                        (rel.items || []).forEach(it => {
-                            tLimpos += (Number(it.tubosLimpos) || 0);
-                            tObstruidos += (Number(it.tubosObstruidos) || 0);
-                            tFerro += (Number(it.tubosComFerro) || 0);
+                    const timer = setTimeout(() => {
+                        // Pizza Chart
+                        let tLimpos = 0, tObstruidos = 0, tFerro = 0;
+                        historyData.forEach(rel => {
+                            (rel.items || []).forEach(it => {
+                                tLimpos += (Number(it.tubosLimpos) || 0);
+                                tObstruidos += (Number(it.tubosObstruidos) || 0);
+                                tFerro += (Number(it.tubosComFerro) || 0);
+                            });
                         });
-                    });
 
-                    const ctxPie = document.getElementById('pieChart');
-                    if (ctxPie) {
-                        if (chartPieRef.current) chartPieRef.current.destroy();
-                        chartPieRef.current = new Chart(ctxPie, {
-                            type: 'doughnut',
-                            data: {
-                                labels: ['Limpos', 'Obstruídos', 'Com Ferro'],
-                                datasets: [{
-                                    data: [tLimpos, tObstruidos, tFerro],
-                                    backgroundColor: ['#22c55e', '#ef4444', '#eab308'],
-                                    borderWidth: 0
-                                }]
-                            },
-                            options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+                        const ctxPie = document.getElementById('pieChart');
+                        if (ctxPie) {
+                            if (chartPieRef.current) chartPieRef.current.destroy();
+                            chartPieRef.current = new Chart(ctxPie, {
+                                type: 'doughnut',
+                                data: {
+                                    labels: ['Limpos', 'Obstruídos', 'Com Ferro'],
+                                    datasets: [{
+                                        data: [tLimpos, tObstruidos, tFerro],
+                                        backgroundColor: ['#22c55e', '#ef4444', '#eab308'],
+                                        borderWidth: 0
+                                    }]
+                                },
+                                options: { cutout: '70%', plugins: { legend: { position: 'bottom' } } }
+                            });
+                        }
+
+                        // Bar Chart
+                        const turnos = { 'ADM': 0, 'T.C': 0, 'T.A': 0 };
+                        historyData.forEach(rel => {
+                            const totalRel = (rel.items || []).reduce((acc, i) => acc + (Number(i.tubosLimpos) || 0), 0);
+                            if(turnos[rel.turno] !== undefined) turnos[rel.turno] += totalRel;
                         });
-                    }
 
-                    // Barras: Produção por Turno
-                    const turnos = { 'ADM': 0, 'T.C': 0, 'T.A': 0 };
-                    historyData.forEach(rel => {
-                        const totalRel = (rel.items || []).reduce((acc, i) => acc + (Number(i.tubosLimpos) || 0), 0);
-                        turnos[rel.turno] = (turnos[rel.turno] || 0) + totalRel;
-                    });
-
-                    const ctxBar = document.getElementById('barChart');
-                    if (ctxBar) {
-                        if (chartBarRef.current) chartBarRef.current.destroy();
-                        chartBarRef.current = new Chart(ctxBar, {
-                            type: 'bar',
-                            data: {
-                                labels: ['ADM', 'T.C', 'T.A'],
-                                datasets: [{
-                                    label: 'Tubos Limpos',
-                                    data: Object.values(turnos),
-                                    backgroundColor: '#1e40af',
-                                    borderRadius: 10
-                                }]
-                            },
-                            options: { scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
-                        });
-                    }
+                        const ctxBar = document.getElementById('barChart');
+                        if (ctxBar) {
+                            if (chartBarRef.current) chartBarRef.current.destroy();
+                            chartBarRef.current = new Chart(ctxBar, {
+                                type: 'bar',
+                                data: {
+                                    labels: ['ADM', 'T.C', 'T.A'],
+                                    datasets: [{
+                                        label: 'Tubos Limpos',
+                                        data: Object.values(turnos),
+                                        backgroundColor: '#1e40af',
+                                        borderRadius: 10
+                                    }]
+                                },
+                                options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+                            });
+                        }
+                    }, 100);
+                    return () => clearTimeout(timer);
                 }
             }, [view, historyData]);
 
@@ -221,30 +226,36 @@
             };
 
             const handleSaveToCloud = async () => {
+                if (!user || !window.db) {
+                    setSaveSuccess(true); // Simulação local
+                    return;
+                }
+                
                 setIsSaving(true);
-                if (window.db && user) {
-                    try {
-                        const { collection, addDoc, serverTimestamp } = window.FirebaseSDK;
-                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
-                        
-                        await addDoc(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), {
-                            ...globalInfo,
-                            items: items.map(it => ({
-                                equipamento: it.equipamento,
-                                tubosLimpos: Number(it.tubosLimpos) || 0,
-                                tubosObstruidos: Number(it.tubosObstruidos) || 0,
-                                tubosComFerro: Number(it.tubosComFerro) || 0,
-                                impactos: it.impactos,
-                                observacoes: it.observacoes,
-                                totalFotos: it.fotosAntes.length + it.fotosDepois.length
-                            })),
-                            userId: user.uid,
-                            createdAt: serverTimestamp()
-                        });
-                        setSaveSuccess(true);
-                    } catch (e) { console.error("Erro Salvar Cloud:", e); }
-                } else { setSaveSuccess(true); }
-                setIsSaving(false);
+                try {
+                    const { collection, addDoc, serverTimestamp } = window.FirebaseSDK;
+                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
+                    
+                    await addDoc(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), {
+                        ...globalInfo,
+                        items: items.map(it => ({
+                            equipamento: it.equipamento,
+                            tubosLimpos: Number(it.tubosLimpos) || 0,
+                            tubosObstruidos: Number(it.tubosObstruidos) || 0,
+                            tubosComFerro: Number(it.tubosComFerro) || 0,
+                            impactos: it.impactos || '',
+                            observacoes: it.observacoes || '',
+                            totalFotos: (it.fotosAntes?.length || 0) + (it.fotosDepois?.length || 0)
+                        })),
+                        userId: user.uid,
+                        createdAt: serverTimestamp()
+                    });
+                    setSaveSuccess(true);
+                } catch (e) { 
+                    console.error("Erro ao salvar dados:", e);
+                } finally {
+                    setIsSaving(false);
+                }
             };
 
             const handleExportCSV = () => {
@@ -267,7 +278,7 @@
                 const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
                 link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `hidrocontrol_export_${new Date().toISOString().slice(0,10)}.csv`);
+                link.setAttribute("download", `hidrocontrol_export.csv`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -294,6 +305,14 @@
                 setView('form');
             };
 
+            const totalLimposGeral = useMemo(() => 
+                historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosLimpos) || 0), 0), 0), 
+            [historyData]);
+
+            const totalFerroGeral = useMemo(() => 
+                historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosComFerro) || 0), 0), 0),
+            [historyData]);
+
             return (
                 <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-50 shadow-2xl border-x border-slate-200">
                     <header className="bg-blue-800 text-white p-6 sticky top-0 z-40 shadow-xl flex items-center justify-between rounded-b-3xl">
@@ -308,48 +327,43 @@
 
                     <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-28">
                         {view === 'dashboard' ? (
-                            /* DASHBOARD FUNCIONAL */
                             <div className="animate-in fade-in duration-500 space-y-6">
                                 <div className="flex justify-between items-center mb-2">
-                                    <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Painel de Produtividade</h2>
+                                    <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Painel Operacional</h2>
                                     <button onClick={handleExportCSV} className="flex items-center gap-1.5 text-[10px] font-black text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 uppercase">
-                                        <IconDownload /> Exportar Dados
+                                        <IconDownload /> Exportar
                                     </button>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center">
-                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Total Limpos</p>
-                                        <h4 className="text-3xl font-black text-blue-700">
-                                            {historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosLimpos) || 0), 0), 0)}
-                                        </h4>
+                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Limpos Acumulado</p>
+                                        <h4 className="text-3xl font-black text-blue-700">{totalLimposGeral}</h4>
                                     </div>
                                     <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center">
                                         <p className="text-[10px] font-black uppercase text-red-400 mb-1">Total Ferro</p>
-                                        <h4 className="text-3xl font-black text-red-600">
-                                            {historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosComFerro) || 0), 0), 0)}
-                                        </h4>
+                                        <h4 className="text-3xl font-black text-red-600">{totalFerroGeral}</h4>
                                     </div>
                                 </div>
 
                                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6">
-                                    <div className="text-center space-y-1">
-                                        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Status Geral dos Tubos</h3>
-                                        <div className="w-full max-w-[200px] mx-auto pt-4"><canvas id="pieChart"></canvas></div>
+                                    <div className="text-center">
+                                        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4">Status dos Tubos</h3>
+                                        <div className="w-full max-w-[180px] mx-auto"><canvas id="pieChart"></canvas></div>
                                     </div>
-                                    <div className="pt-6 border-t border-slate-50 space-y-1">
-                                        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-center mb-4">Produção Acumulada por Turno</h3>
+                                    <div className="pt-6 border-t border-slate-50">
+                                        <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-center mb-4">Produção por Turno</h3>
                                         <canvas id="barChart" height="150"></canvas>
                                     </div>
                                 </div>
 
                                 <section className="space-y-3">
-                                    <h3 className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Histórico Recente</h3>
-                                    {historyData.slice(0, 8).map((rel, rIdx) => (
-                                        <div key={rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between">
+                                    <h3 className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Últimos Lançamentos</h3>
+                                    {historyData.slice(0, 5).map((rel, rIdx) => (
+                                        <div key={rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm">
                                             <div>
                                                 <p className="text-xs font-black text-slate-700">{rel.data} - Turno {rel.turno}</p>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{rel.items?.length} Equipamentos • {(rel.items || []).reduce((a, i) => a + (Number(i.tubosLimpos) || 0), 0)} tubos</p>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{rel.items?.length || 0} TAGs</p>
                                             </div>
                                             <div className="text-blue-700 font-black text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md">{rel.empresa}</div>
                                         </div>
@@ -357,7 +371,6 @@
                                 </section>
                             </div>
                         ) : view === 'form' ? (
-                            /* FORMULÁRIO COM MÚLTIPLOS TAGS */
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
                                 <section className="space-y-4">
                                     <div className="grid grid-cols-2 gap-3">
@@ -374,13 +387,13 @@
 
                                 <div className="space-y-10">
                                     {items.map((item, idx) => (
-                                        <div key={idx} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6 relative border-t-4 border-t-blue-500">
+                                        <div key={idx} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6 relative border-t-4 border-t-blue-500 animate-in zoom-in-95">
                                             {items.length > 1 && (
                                                 <button onClick={() => { const n = [...items]; n.splice(idx, 1); setItems(n); }} className="absolute -top-4 -right-4 bg-red-500 text-white p-2.5 rounded-full shadow-xl"><IconTrash /></button>
                                             )}
                                             
                                             <div className="relative">
-                                                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none">Equipamento #{idx + 1}</label>
+                                                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest">Equipamento #{idx + 1}</label>
                                                 <div className="relative">
                                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><IconSearch /></div>
                                                     <input 
@@ -395,7 +408,7 @@
                                                 {activeDropdownIndex === idx && (
                                                     <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">
                                                         {equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (
-                                                            <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 last:border-none font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer">{tag}</div>
+                                                            <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer">{tag}</div>
                                                         ))}
                                                     </div>
                                                 )}
@@ -419,7 +432,7 @@
                                                             {item[type].map((pic, pIdx) => (
                                                                 <div key={pIdx} className="relative aspect-square border border-slate-100 rounded-xl overflow-hidden">
                                                                     <img src={pic} className="image-preview w-full h-full" />
-                                                                    <button onClick={() => { const n = [...items]; n[idx][type].splice(pIdx,1); setItems(n); }} className="absolute -top-0.5 -right-0.5 bg-red-500 text-white rounded-full p-0.5 scale-75 shadow-md"><IconX /></button>
+                                                                    <button onClick={() => { const n = [...items]; n[idx][type].splice(pIdx,1); setItems(n); }} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 scale-75 shadow-md"><IconX /></button>
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -427,36 +440,36 @@
                                                 ))}
                                             </div>
 
-                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva impactos ou dificuldades..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
+                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Impactos ou dificuldades..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
                                         </div>
                                     ))}
                                 </div>
 
-                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-blue-100 transition-all">
+                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-blue-50 transition-all shadow-sm">
                                     <IconPlus /> Adicionar Equipamento
                                 </button>
 
-                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all mt-6 disabled:opacity-30">Revisar Relatório Completo</button>
+                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all mt-6 disabled:opacity-30">Revisar Relatório</button>
                             </div>
                         ) : (
-                            /* TELA DE REVISÃO */
+                            /* PREVIEW */
                             <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6 pt-2 text-sm">
                                 <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800 space-y-6">
                                     <div className="flex justify-between items-start border-b border-slate-800 pb-4">
                                         <div className="space-y-1">
-                                            <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo Consolidado</h2>
-                                            <p className="text-slate-500 text-[10px] font-bold uppercase">{globalInfo.data} • {globalInfo.turno}</p>
+                                            <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo do Dia</h2>
+                                            <p className="text-slate-500 text-[10px] font-bold uppercase">{globalInfo.data} • Turno {globalInfo.turno}</p>
                                         </div>
                                         <span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full">{globalInfo.empresa}</span>
                                     </div>
                                     
-                                    <div className="space-y-6">
+                                    <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2">
                                         {items.map((it, i) => (
                                             <div key={i} className="font-mono text-xs border-b border-slate-800/50 pb-4 last:border-none">
-                                                <p className="text-blue-300 font-black mb-2 uppercase">{i+1}. TAG: {it.equipamento}</p>
+                                                <p className="text-blue-300 font-black mb-2 uppercase">{i+1}. {it.equipamento}</p>
                                                 <div className="grid grid-cols-2 gap-y-1.5 pl-3">
                                                     <span className="text-slate-500">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span>
-                                                    <span className="text-slate-500">Status:</span> <span className="text-slate-300 italic">{it.fotosAntes.length}A / {it.fotosDepois.length}D Fotos</span>
+                                                    <span className="text-slate-500">Status:</span> <span className="text-slate-300 italic">{it.fotosAntes.length}A / {it.fotosDepois.length}D</span>
                                                 </div>
                                             </div>
                                         ))}
@@ -466,20 +479,20 @@
                                 {saveSuccess ? (
                                     <div className="bg-green-50 border-2 border-green-200 p-8 rounded-[3rem] text-center space-y-4 shadow-xl">
                                         <div className="bg-green-500 text-white w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2"><IconCheck /></div>
-                                        <p className="text-green-800 font-black uppercase text-xs tracking-widest">✅ Relatório Registrado!</p>
+                                        <p className="text-green-800 font-black uppercase text-xs tracking-widest">✅ Dados Gravados!</p>
                                         <div className="flex flex-col gap-3">
-                                            <button onClick={handleSendWhatsApp} className="bg-green-600 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-green-100"><IconSend /> Notificar via WhatsApp</button>
+                                            <button onClick={handleSendWhatsApp} className="bg-green-600 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-green-100"><IconSend /> Notificar por WhatsApp</button>
                                             <button onClick={resetForm} className="bg-slate-800 text-white py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-widest">Novo Registro</button>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-3">
                                         <button onClick={handleSaveToCloud} disabled={isSaving} className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50">
-                                            {isSaving ? 'Gravando dados...' : <><IconSave /> Registrar Informações na Nuvem</>}
+                                            {isSaving ? 'Processando...' : <><IconSave /> Registrar na Nuvem</>}
                                         </button>
                                         <div className="flex gap-4">
                                             <button onClick={() => setView('form')} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400">Editar</button>
-                                            <button onClick={handleSendWhatsApp} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg"><IconSend /> Pular para WhatsApp</button>
+                                            <button onClick={handleSendWhatsApp} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg"><IconSend /> Enviar WhatsApp</button>
                                         </div>
                                     </div>
                                 )}
@@ -488,7 +501,7 @@
                     </main>
 
                     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white/90 backdrop-blur-xl border-t border-slate-100 px-14 py-5 flex justify-around items-center z-40 rounded-t-[3rem] shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view === 'form' || view === 'preview' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
+                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view !== 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
                             <IconClipboard />
                             <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">Relatório</span>
                         </button>
