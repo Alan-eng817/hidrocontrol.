@@ -3,11 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HidroControl - Montisol</title>
+    <title>HidroControl - Gestão de Produtividade</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+        window.FirebaseSDK = { initializeApp, getFirestore, collection, addDoc, serverTimestamp, query, orderBy, limit, onSnapshot, getAuth, signInAnonymously, onAuthStateChanged };
+    </script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -19,6 +29,8 @@
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
+        .image-preview { object-fit: cover; width: 100%; height: 100%; border-radius: 2rem; }
+        .progress-bar { transition: width 1s ease-in-out; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 overflow-x-hidden">
@@ -27,51 +39,80 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
+        // Icons
         const IconClipboard = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>;
         const IconSearch = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
         const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
         const IconSend = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
         const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
         const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>;
+        const IconChart = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>;
 
         const App = () => {
-            const [step, setStep] = useState('form');
+            const [view, setView] = useState('form'); // 'form', 'preview', 'dashboard'
             const [showTagList, setShowTagList] = useState(false);
             const [searchTerm, setSearchTerm] = useState('');
+            const [user, setUser] = useState(null);
+            const [isSaving, setIsSaving] = useState(false);
+            const [historyData, setHistoryData] = useState([]);
+            
             const dropdownRef = useRef(null);
+            const inputAntesRef = useRef(null);
+            const inputDepoisRef = useRef(null);
 
-            const [formData, setFormData] = useState({
+            const initialFormState = {
                 data: new Date().toLocaleDateString('pt-BR'),
+                empresa: 'Montisol',
                 turno: 'ADM',
                 equipamento: '',
                 atividade: 'Limpeza de tubos',
                 tubosLimpos: '',
                 tubosObstruidos: '',
                 tubosComFerro: '',
+                impactos: '',
                 observacoes: '',
-                fotoAntes: false,
-                fotoDepois: false
-            });
+                fotoAntes: null,
+                fotoDepois: null,
+                previewAntes: null,
+                previewDepois: null
+            };
+
+            const [formData, setFormData] = useState(initialFormState);
+
+            useEffect(() => {
+                const initFirebase = async () => {
+                    if (!window.FirebaseSDK) return;
+                    const { initializeApp, getFirestore, getAuth, signInAnonymously, onAuthStateChanged, collection, query, orderBy, limit, onSnapshot } = window.FirebaseSDK;
+                    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                    if (!firebaseConfig.apiKey) return;
+
+                    const app = initializeApp(firebaseConfig);
+                    const auth = getAuth(app);
+                    const db = getFirestore(app);
+                    window.db = db;
+
+                    await signInAnonymously(auth);
+                    onAuthStateChanged(auth, (u) => {
+                        setUser(u);
+                        if(u) {
+                            const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
+                            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'relatorios'), orderBy('createdAt', 'desc'), limit(50));
+                            onSnapshot(q, (snapshot) => {
+                                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                                setHistoryData(data);
+                            }, (err) => console.error(err));
+                        }
+                    });
+                };
+                initFirebase();
+            }, []);
 
             const equipamentos = useMemo(() => [
                 '025A-TC-21A','025A-TC-21B','025A-TC-21C','025A-TC-21D','025A-TC-21E','025A-TC-21F',
                 '025A-TC-31A','025A-TC-31B','025A-TC-31C','025A-TC-31D','025A-TC-31E','025A-TC-31F',
                 '030-TC-001','030-TC-002','030-TC-003','030-TC-004','030-TC-005','030-TC-006','030-TC-007','030-TC-008','030-TC-009','030-TC-010',
-                '030-TC-019','030-TC-029','030-TC-11A','030-TC-11B','030-TC-11C','030-TC-11D','030-TC-11E','030-TC-11F',
-                '030-TC-12A','030-TC-12B','030-TC-12C','030-TC-12D','030-TC-12E','030-TC-12F',
-                '030-TC-13A','030-TC-13B','030-TC-13C','030-TC-13D','030-TC-13E','030-TC-13F',
-                '030-TC-17A','030-TC-17B','030-TC-17C','030-TC-17D','030-TC-17E','030-TC-17F',
-                '030-TC-18A','030-TC-18B','030-TC-18C','030-TC-18D','030-TC-18E','030-TC-18F',
-                '030-TC-21A','030-TC-21B','030-TC-22A','030-TC-22B','030-TC-22C','030-TC-22D',
-                '030-TC-23A','030-TC-23B','030-TC-23C','030-TC-23D','030-TC-24A','030-TC-24B','030-TC-24C','030-TC-24D',
-                '030-TC-25A','030-TC-25B','030-TC-25C','030-TC-25D','030-TC-26A','030-TC-26B','030-TC-26C','030-TC-26D','030-TC-26E','030-TC-26F',
-                '030-TC-31A','030-TC-31B','030-TC-32A','030-TC-32B','030-TC-32C','030-TC-32D',
-                '030-TC-33A','030-TC-33B','030-TC-33C','030-TC-33D','030-TC-34A','030-TC-34B','030-TC-34C','030-TC-34D',
-                '030-TC-35A','030-TC-35B','030-TC-35C','030-TC-35D','030-TC-36A','030-TC-36B','030-TC-36C','030-TC-36D','030-TC-36E','030-TC-36F',
-                '040-TC-011','040-TC-012','040-TC-013','040-TC-014','040-TC-015',
-                '042-TC-011','042-TC-012','042-TC-013','042-TC-014','042-TC-015','042-TC-016','042-TC-017','042-TC-018','042-TC-019',
-                '042-TC-021','042-TC-022','042-TC-023','042-TC-024','042-TC-025','042-TC-026','042-TC-027','042-TC-028','042-TC-029',
-                '042-TC-031','042-TC-032','042-TC-033','042-TC-034','042-TC-035','042-TC-036','042-TC-037','042-TC-038','042-TC-039'
+                '030-TC-22A','030-TC-22B','030-TC-22C','030-TC-22D','030-TC-23A','030-TC-23B','030-TC-24A','030-TC-24B',
+                '040-TC-011','042-TC-011','042-TC-039'
             ], []);
 
             const filteredTags = useMemo(() => 
@@ -79,9 +120,36 @@
                 [searchTerm, equipamentos]
             );
 
+            // Dashboard Stats
+            const stats = useMemo(() => {
+                const totalLimpos = historyData.reduce((acc, curr) => acc + (Number(curr.tubosLimpos) || 0), 0);
+                const totalFerro = historyData.reduce((acc, curr) => acc + (Number(curr.tubosComFerro) || 0), 0);
+                const turnosCount = historyData.reduce((acc, curr) => {
+                    acc[curr.turno] = (acc[curr.turno] || 0) + (Number(curr.tubosLimpos) || 0);
+                    return acc;
+                }, { 'ADM': 0, 'T.C': 0, 'T.A': 0 });
+                
+                return { totalLimpos, totalFerro, turnosCount };
+            }, [historyData]);
+
             const handleInputChange = (e) => {
                 const { name, value } = e.target;
                 setFormData(prev => ({ ...prev, [name]: value }));
+            };
+
+            const handleFileChange = (e, type) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setFormData(prev => ({ 
+                            ...prev, 
+                            [type]: file,
+                            [type === 'fotoAntes' ? 'previewAntes' : 'previewDepois']: reader.result
+                        }));
+                    };
+                    reader.readAsDataURL(file);
+                }
             };
 
             const selectTag = (tag) => {
@@ -90,8 +158,35 @@
                 setShowTagList(false);
             };
 
-            const generateWhatsAppMessage = () => {
-                const msg = `*HIDROJATO - MONTISOL*%0A` +
+            const handleFinalize = async () => {
+                setIsSaving(true);
+                
+                if (window.db && user) {
+                    try {
+                        const { collection, addDoc, serverTimestamp } = window.FirebaseSDK;
+                        const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
+                        
+                        await addDoc(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), {
+                            data: formData.data,
+                            empresa: formData.empresa,
+                            turno: formData.turno,
+                            equipamento: formData.equipamento,
+                            tubosLimpos: Number(formData.tubosLimpos) || 0,
+                            tubosObstruidos: Number(formData.tubosObstruidos) || 0,
+                            tubosComFerro: Number(formData.tubosComFerro) || 0,
+                            impactos: formData.impactos,
+                            observacoes: formData.observacoes,
+                            temFotoAntes: !!formData.fotoAntes,
+                            temFotoDepois: !!formData.fotoDepois,
+                            userId: user.uid,
+                            createdAt: serverTimestamp()
+                        });
+                    } catch (e) {
+                        console.error("Erro ao salvar:", e);
+                    }
+                }
+
+                const msg = `*HIDROJATO - ${formData.empresa.toUpperCase()}*%0A` +
                     `*Atividades Realizadas*%0A` +
                     `🔹 ${formData.atividade}%0A%0A` +
                     `*Equipamento:* ${formData.equipamento}%0A` +
@@ -99,10 +194,14 @@
                     `✅ Tubos Limpos: ${formData.tubosLimpos}%0A` +
                     `${formData.tubosObstruidos ? `❌ Tubos Obstruídos: ${formData.tubosObstruidos}%0A` : ''}` +
                     `${formData.tubosComFerro ? `⚠️ Tubos com Ferro: ${formData.tubosComFerro}%0A` : ''}` +
-                    `📝 *Observações:* ${formData.observacoes || 'Nenhuma'}%0A%0A` +
-                    `_Relatório gerado via App HidroControl_`;
+                    `${formData.impactos ? `%0A⚡ *Impactos:* ${formData.impactos}%0A` : ''}` +
+                    `📝 *Obs:* ${formData.observacoes || 'Nenhuma'}%0A%0A` +
+                    `_Relatório gerado via HidroControl_`;
                 
                 window.open(`https://wa.me/?text=${msg}`, '_blank');
+                setFormData(initialFormState);
+                setStep('form');
+                setIsSaving(false);
             };
 
             useEffect(() => {
@@ -115,92 +214,183 @@
 
             return (
                 <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-50 shadow-2xl border-x border-slate-200">
+                    {/* Header */}
                     <header className="bg-blue-800 text-white p-6 sticky top-0 z-40 shadow-xl flex items-center justify-between rounded-b-3xl">
                         <div className="flex items-center gap-3">
                             <IconClipboard />
                             <h1 className="font-black text-xl tracking-tight leading-none uppercase">Hidro<span className="text-blue-300">Control</span></h1>
                         </div>
-                        <div className="bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 text-[10px] font-black">{formData.data}</div>
+                        <div className="flex flex-col items-end">
+                            <div className="bg-blue-900/40 px-3 py-1 rounded-xl border border-blue-500/50 text-[10px] font-black uppercase tracking-tighter">{view === 'dashboard' ? 'Dash' : formData.data}</div>
+                        </div>
                     </header>
 
                     <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-28">
-                        {step === 'form' ? (
+                        {view === 'dashboard' ? (
+                            <div className="animate-in fade-in duration-500 space-y-6">
+                                {/* Dashboard KPI Cards */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Produção Total</p>
+                                        <h4 className="text-3xl font-black text-blue-700">{stats.totalLimpos} <span className="text-[10px] text-slate-400 font-bold uppercase">Tubos</span></h4>
+                                    </div>
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100">
+                                        <p className="text-[10px] font-black uppercase text-red-400 mb-1 tracking-widest italic">Tubos c/ Ferro</p>
+                                        <h4 className="text-3xl font-black text-red-600">{stats.totalFerro} <span className="text-[10px] text-slate-400 font-bold uppercase">Tubos</span></h4>
+                                    </div>
+                                </div>
+
+                                {/* Chart: Produção por Turno */}
+                                <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
+                                    <h3 className="text-[10px] font-black uppercase text-slate-500 mb-6 tracking-widest text-center">Desempenho por Turno</h3>
+                                    <div className="space-y-5">
+                                        {Object.entries(stats.turnosCount).map(([turno, count]) => {
+                                            const percentage = stats.totalLimpos > 0 ? (count / stats.totalLimpos) * 100 : 0;
+                                            return (
+                                                <div key={turno} className="space-y-1">
+                                                    <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
+                                                        <span>Turno {turno}</span>
+                                                        <span>{count} Tubos</span>
+                                                    </div>
+                                                    <div className="h-4 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                                                        <div 
+                                                            className="h-full bg-blue-600 progress-bar rounded-full" 
+                                                            style={{ width: `${percentage}%` }}
+                                                        ></div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </section>
+
+                                {/* Recent Activity List */}
+                                <section className="space-y-4">
+                                    <h3 className="text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest text-center">Últimos Relatórios</h3>
+                                    {historyData.slice(0, 5).map(rel => (
+                                        <div key={rel.id} className="bg-white p-4 rounded-3xl shadow-sm border border-slate-100 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-700 font-black text-xs">{rel.empresa[0]}</div>
+                                                <div>
+                                                    <p className="text-xs font-black uppercase text-slate-700">{rel.equipamento}</p>
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase">Turno {rel.turno} • {rel.tubosLimpos} limpos</p>
+                                                </div>
+                                            </div>
+                                            <div className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase ${rel.tubosComFerro > 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                                {rel.tubosComFerro > 0 ? 'Ferro Identificado' : 'Ok'}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {historyData.length === 0 && <p className="text-center text-[10px] text-slate-400 italic">Nenhum dado registrado na Cloud.</p>}
+                                </section>
+                            </div>
+                        ) : step === 'form' ? (
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
+                                {/* Form View (Same as before) */}
+                                <section>
+                                    <h3 className="text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest text-center">Empresa Responsável</h3>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {['Montisol', 'Constec'].map(e => (
+                                            <button key={e} onClick={() => setFormData({...formData, empresa: e})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${formData.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>
+                                        ))}
+                                    </div>
+                                </section>
+
                                 <section>
                                     <h3 className="text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest text-center">Turno de Operação</h3>
                                     <div className="grid grid-cols-3 gap-3">
                                         {['ADM', 'T.C', 'T.A'].map(t => (
-                                            <button key={t} onClick={() => setFormData({...formData, turno: t})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${formData.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200 scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>
+                                            <button key={t} onClick={() => setFormData({...formData, turno: t})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${formData.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>
                                         ))}
                                     </div>
                                 </section>
 
                                 <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6" ref={dropdownRef}>
                                     <div className="relative">
-                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-wider">TAG do Equipamento</label>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-wider font-black">TAG do Equipamento</label>
                                         <div className="relative">
                                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><IconSearch /></div>
                                             <input type="text" placeholder="Pesquisar TAG..." value={searchTerm} onFocus={() => setShowTagList(true)} onChange={(e) => { setSearchTerm(e.target.value); setShowTagList(true); }} className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-black text-sm uppercase" />
                                             {searchTerm && <button onClick={() => {setSearchTerm(''); setShowTagList(true)}} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"><IconX /></button>}
                                         </div>
                                         {showTagList && (
-                                            <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-60 overflow-y-auto tag-dropdown overflow-x-hidden ring-1 ring-black ring-opacity-5">
-                                                {filteredTags.length > 0 ? filteredTags.map(tag => (
-                                                    <div key={tag} onClick={() => selectTag(tag)} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 last:border-none font-bold text-sm text-slate-700 flex justify-between items-center transition-colors">{tag} <div className="w-2 h-2 rounded-full bg-blue-200"></div></div>
-                                                )) : <div className="p-8 text-center text-slate-400 text-[10px] font-bold uppercase italic">TAG não encontrada</div>}
+                                            <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-60 overflow-y-auto tag-dropdown ring-1 ring-black/5">
+                                                {filteredTags.map(tag => (
+                                                    <div key={tag} onClick={() => selectTag(tag)} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-bold text-sm text-slate-700 flex justify-between items-center">{tag} <div className="w-2 h-2 rounded-full bg-blue-200"></div></div>
+                                                ))}
                                             </div>
                                         )}
                                     </div>
 
                                     <div className="grid grid-cols-3 gap-3">
-                                        <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Limpos</label><input type="number" name="tubosLimpos" value={formData.tubosLimpos} onChange={handleInputChange} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500" /></div>
-                                        <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Obstruídos</label><input type="number" name="tubosObstruidos" value={formData.tubosObstruidos} onChange={handleInputChange} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500" /></div>
-                                        <div className="space-y-1"><label className="text-[9px] font-black text-red-500 block uppercase text-center tracking-tighter italic">C/ Ferro</label><input type="number" name="tubosComFerro" value={formData.tubosComFerro} onChange={handleInputChange} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-black text-lg text-red-600 focus:ring-2 focus:ring-red-500" /></div>
+                                        <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Limpos</label><input type="number" name="tubosLimpos" value={formData.tubosLimpos} onChange={handleInputChange} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500 transition-all" /></div>
+                                        <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Obstruídos</label><input type="number" name="tubosObstruidos" value={formData.tubosObstruidos} onChange={handleInputChange} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500 transition-all" /></div>
+                                        <div className="space-y-1"><label className="text-[9px] font-black text-red-500 block uppercase text-center tracking-tighter italic">C/ Ferro</label><input type="number" name="tubosComFerro" value={formData.tubosComFerro} onChange={handleInputChange} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-black text-lg text-red-600 focus:ring-2 focus:ring-red-500 transition-all" /></div>
                                     </div>
                                 </section>
 
                                 <section>
                                     <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest text-center">Evidências Visuais</h3>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <button onClick={() => setFormData({...formData, fotoAntes: !formData.fotoAntes})} className={`aspect-square rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center transition-all shadow-sm ${formData.fotoAntes ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
-                                            {formData.fotoAntes ? <IconCheck /> : <IconCamera />}
-                                            <span className="text-[10px] font-black uppercase mt-3 tracking-widest">{formData.fotoAntes ? 'Anexado' : 'Foto Antes'}</span>
+                                        <input type="file" accept="image/*" capture="environment" className="hidden" ref={inputAntesRef} onChange={(e) => handleFileChange(e, 'fotoAntes')} />
+                                        <button onClick={() => inputAntesRef.current.click()} className={`relative aspect-square rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center transition-all shadow-sm overflow-hidden ${formData.fotoAntes ? 'border-green-600 bg-white shadow-green-100' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
+                                            {formData.previewAntes ? <img src={formData.previewAntes} className="image-preview" /> : <><IconCamera /><span className="text-[10px] font-black uppercase mt-3 tracking-widest leading-none text-center">Antes</span></>}
                                         </button>
-                                        <button onClick={() => setFormData({...formData, fotoDepois: !formData.fotoDepois})} className={`aspect-square rounded-[2rem] border-2 border-dashed flex flex-col items-center justify-center transition-all shadow-sm ${formData.fotoDepois ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
-                                            {formData.fotoDepois ? <IconCheck /> : <IconCamera />}
-                                            <span className="text-[10px] font-black uppercase mt-3 tracking-widest">{formData.fotoDepois ? 'Anexado' : 'Foto Depois'}</span>
+                                        <input type="file" accept="image/*" capture="environment" className="hidden" ref={inputDepoisRef} onChange={(e) => handleFileChange(e, 'fotoDepois')} />
+                                        <button onClick={() => inputDepoisRef.current.click()} className={`relative aspect-square rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center transition-all shadow-sm overflow-hidden ${formData.fotoDepois ? 'border-green-600 bg-white shadow-green-100' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
+                                            {formData.previewDepois ? <img src={formData.previewDepois} className="image-preview" /> : <><IconCamera /><span className="text-[10px] font-black uppercase mt-3 tracking-widest leading-none text-center">Depois</span></>}
                                         </button>
                                     </div>
                                 </section>
 
-                                <button onClick={() => setStep('preview')} disabled={!formData.equipamento || !formData.tubosLimpos} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 disabled:opacity-30 disabled:grayscale active:scale-95 transition-all mt-4">Revisar Relatório</button>
+                                <section className="space-y-4">
+                                    <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none">Impactos Identificados</label><textarea name="impactos" value={formData.impactos} onChange={handleInputChange} placeholder="Atrasos, bloqueios ou dificuldades..." rows="2" className="w-full p-4 bg-white border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"></textarea></div>
+                                    <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none italic">Observações</label><textarea name="observacoes" value={formData.observacoes} onChange={handleInputChange} placeholder="Detalhes adicionais..." rows="2" className="w-full p-4 bg-white border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"></textarea></div>
+                                </section>
+
+                                <button onClick={() => setStep('preview')} disabled={!formData.equipamento || !formData.tubosLimpos} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all mt-4 disabled:opacity-30">Revisar Relatório</button>
                             </div>
                         ) : (
                             <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6 pt-2 text-sm">
-                                <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl relative overflow-hidden border border-slate-800">
-                                    <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 rounded-full -mr-20 -mt-20"></div>
-                                    <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest mb-6 border-b border-slate-800 pb-3">Resumo da Atividade</h2>
+                                <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800">
+                                    <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-3">
+                                        <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo Atividade</h2>
+                                        <span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full">{formData.empresa}</span>
+                                    </div>
                                     <div className="space-y-4 font-mono">
-                                        <div className="flex justify-between items-center"><span className="text-slate-500 text-[9px] uppercase font-bold tracking-widest">TAG</span> <span className="text-white font-black">{formData.equipamento}</span></div>
-                                        <div className="flex justify-between items-center"><span className="text-slate-500 text-[9px] uppercase font-bold tracking-widest">Turno</span> <span className="text-slate-300">{formData.turno}</span></div>
+                                        <div className="flex justify-between items-center text-slate-300"><span>TAG:</span> <span className="text-white font-black uppercase">{formData.equipamento}</span></div>
+                                        <div className="flex justify-between items-center text-slate-300"><span>Turno:</span> <span>{formData.turno}</span></div>
                                         <div className="h-px bg-slate-800 my-2"></div>
-                                        <div className="flex justify-between items-center"><span className="text-green-500 text-[9px] uppercase font-bold tracking-widest">✅ Limpos</span> <span className="text-green-400 font-black text-xl">{formData.tubosLimpos}</span></div>
-                                        {formData.tubosObstruidos > 0 && <div className="flex justify-between items-center"><span className="text-red-500 text-[9px] uppercase font-bold tracking-widest">❌ Obstruídos</span> <span className="text-red-400 font-bold">{formData.tubosObstruidos}</span></div>}
-                                        {formData.tubosComFerro > 0 && <div className="flex justify-between items-center text-yellow-400 italic font-bold bg-yellow-400/10 p-2 rounded-lg -mx-2"><span className="text-[9px] uppercase tracking-widest">⚠️ Com Ferro</span> <span>{formData.tubosComFerro}</span></div>}
+                                        <div className="flex justify-between items-center text-green-400"><span>✅ Limpos:</span> <span className="font-black text-xl">{formData.tubosLimpos}</span></div>
+                                        {formData.tubosObstruidos > 0 && <div className="flex justify-between items-center text-red-400"><span>❌ Obstruídos:</span> <span>{formData.tubosObstruidos}</span></div>}
+                                        {formData.tubosComFerro > 0 && <div className="flex justify-between items-center text-yellow-400 bg-yellow-400/10 p-2 rounded-lg -mx-2"><span>⚠️ Ferro:</span> <span className="font-bold">{formData.tubosComFerro}</span></div>}
                                     </div>
                                 </div>
                                 <div className="flex gap-4 px-2">
-                                    <button onClick={() => setStep('form')} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest border border-slate-200 text-slate-400 shadow-sm active:bg-slate-100 transition-all">Editar</button>
-                                    <button onClick={generateWhatsAppMessage} className="flex-[2] bg-green-600 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-green-200 active:scale-95 transition-all"><IconSend /> Enviar Grupo Zap</button>
+                                    <button onClick={() => setStep('form')} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest border border-slate-200 text-slate-400 active:bg-slate-100 shadow-sm transition-all">Editar</button>
+                                    <button onClick={handleFinalize} disabled={isSaving} className="flex-[2] bg-green-600 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3 shadow-xl shadow-green-200 active:scale-95 transition-all">
+                                        {isSaving ? 'Salvando...' : <><IconSend /> Enviar Zap</>}
+                                    </button>
                                 </div>
                             </div>
                         )}
                     </main>
 
+                    {/* Nav Bar */}
                     <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white/90 backdrop-blur-xl border-t border-slate-100 px-10 py-5 flex justify-around items-center z-40 rounded-t-[2.5rem] shadow-[0_-10px_30px_rgba(0,0,0,0.03)]">
-                        <div className="flex flex-col items-center text-blue-800 scale-110 transition-all cursor-pointer"><IconClipboard /><span className="text-[8px] font-black uppercase mt-1 tracking-widest tracking-tighter">Relatório</span></div>
-                        <div className="relative -mt-12"><div className="w-14 h-14 rounded-full bg-blue-800 text-white flex items-center justify-center border-4 border-slate-50 shadow-xl shadow-blue-200 active:scale-90 transition-all"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></div></div>
-                        <div className="flex flex-col items-center text-slate-300 opacity-50 cursor-not-allowed transition-all"><IconSearch /><span className="text-[8px] font-black uppercase mt-1 tracking-widest tracking-tighter font-bold">Ativos</span></div>
+                        <button onClick={() => {setView('form'); setStep('form')}} className={`flex flex-col items-center transition-all ${view === 'form' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
+                            <IconClipboard />
+                            <span className="text-[8px] font-black uppercase mt-1 tracking-tighter">Relatório</span>
+                        </button>
+                        <div className="relative -mt-12">
+                            <div className="w-14 h-14 rounded-full bg-blue-800 text-white flex items-center justify-center border-4 border-slate-50 shadow-xl shadow-blue-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                            </div>
+                        </div>
+                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
+                            <IconChart />
+                            <span className="text-[8px] font-black uppercase mt-1 tracking-tighter font-bold">Dashboard</span>
+                        </button>
                     </nav>
                 </div>
             );
