@@ -43,7 +43,7 @@
             from { opacity: 0; transform: translateY(-10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .image-preview { object-fit: cover; width: 100%; height: 100%; border-radius: 2rem; }
+        .image-preview { object-fit: cover; width: 100%; height: 100%; border-radius: 1rem; }
         .progress-bar { transition: width 1s ease-in-out; }
     </style>
 </head>
@@ -53,33 +53,33 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // Ícones SVG
+        // Ícones
         const IconClipboard = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>;
         const IconSearch = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
-        const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
+        const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
         const IconSend = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
         const IconSave = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
+        const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+        const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
         const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
-        const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>;
         const IconChart = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>;
 
         const App = () => {
             const [view, setView] = useState('form'); 
-            const [showTagList, setShowTagList] = useState(false);
-            const [searchTerm, setSearchTerm] = useState('');
             const [user, setUser] = useState(null);
             const [isSaving, setIsSaving] = useState(false);
             const [historyData, setHistoryData] = useState([]);
             const [saveSuccess, setSaveSuccess] = useState(false);
+            const [activeDropdownIndex, setActiveDropdownIndex] = useState(null);
             
-            const dropdownRef = useRef(null);
-            const inputAntesRef = useRef(null);
-            const inputDepoisRef = useRef(null);
-
-            const initialFormState = {
+            // Estado principal: Informações Gerais + Lista de Equipamentos
+            const [globalInfo, setGlobalInfo] = useState({
                 data: new Date().toLocaleDateString('pt-BR'),
                 empresa: 'Montisol',
-                turno: 'ADM',
+                turno: 'ADM'
+            });
+
+            const initialItemState = {
                 equipamento: '',
                 atividade: 'Limpeza de tubos',
                 tubosLimpos: '',
@@ -87,24 +87,20 @@
                 tubosComFerro: '',
                 impactos: '',
                 observacoes: '',
-                fotoAntes: null,
-                fotoDepois: null,
-                previewAntes: null,
-                previewDepois: null
+                fotosAntes: [], // Array de base64/URLs
+                fotosDepois: []
             };
 
-            const [formData, setFormData] = useState(initialFormState);
+            const [items, setItems] = useState([initialItemState]);
 
-            // Auth Effect
+            // Firebase Integration
             useEffect(() => {
                 const initAuth = async () => {
                     if (!window.FirebaseSDK) return;
                     const { initializeApp, getFirestore, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = window.FirebaseSDK;
-                    
                     try {
                         const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
                         if (!firebaseConfigStr) return;
-
                         const firebaseConfig = JSON.parse(firebaseConfigStr);
                         const app = initializeApp(firebaseConfig);
                         const auth = getAuth(app);
@@ -116,40 +112,24 @@
                         } else {
                             await signInAnonymously(auth);
                         }
-
                         onAuthStateChanged(auth, setUser);
-                    } catch (e) {
-                        console.error("Auth Init Error:", e);
-                    }
+                    } catch (e) { console.error("Auth Init Error:", e); }
                 };
                 initAuth();
             }, []);
 
-            // History Sync Effect
             useEffect(() => {
                 if (!user || !window.db) return;
-
                 const { collection, query, orderBy, limit, onSnapshot } = window.FirebaseSDK;
                 const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
-                
-                const q = query(
-                    collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), 
-                    orderBy('createdAt', 'desc'), 
-                    limit(50)
-                );
-
-                const unsubscribe = onSnapshot(q, 
-                    (snapshot) => {
-                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        setHistoryData(data);
-                    }, 
-                    (err) => console.error("Firestore Sync Error:", err)
-                );
-
+                const q = query(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), orderBy('createdAt', 'desc'), limit(50));
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    setHistoryData(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                }, (err) => console.error("Firestore Sync Error:", err));
                 return () => unsubscribe();
             }, [user]);
 
-            const equipamentos = useMemo(() => [
+            const equipamentosLista = useMemo(() => [
                 '025A-TC-21A','025A-TC-21B','025A-TC-21C','025A-TC-21D','025A-TC-21E','025A-TC-21F',
                 '025A-TC-31A','025A-TC-31B','025A-TC-31C','025A-TC-31D','025A-TC-31E','025A-TC-31F',
                 '030-TC-001','030-TC-002','030-TC-003','030-TC-004','030-TC-005','030-TC-006','030-TC-007','030-TC-008','030-TC-009','030-TC-010',
@@ -157,47 +137,61 @@
                 '040-TC-011','042-TC-011','042-TC-039'
             ], []);
 
-            const filteredTags = useMemo(() => 
-                equipamentos.filter(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())),
-                [searchTerm, equipamentos]
-            );
-
-            const stats = useMemo(() => {
-                const totalLimpos = historyData.reduce((acc, curr) => acc + (Number(curr.tubosLimpos) || 0), 0);
-                const totalFerro = historyData.reduce((acc, curr) => acc + (Number(curr.tubosComFerro) || 0), 0);
-                const turnosCount = historyData.reduce((acc, curr) => {
-                    const turnoKey = curr.turno || 'ADM';
-                    acc[turnoKey] = (acc[turnoKey] || 0) + (Number(curr.tubosLimpos) || 0);
-                    return acc;
-                }, { 'ADM': 0, 'T.C': 0, 'T.A': 0 });
-                return { totalLimpos, totalFerro, turnosCount };
-            }, [historyData]);
-
-            const handleInputChange = (e) => {
-                const { name, value } = e.target;
-                setFormData(prev => ({ ...prev, [name]: value }));
-            };
-
-            const handleFileChange = (e, type) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setFormData(prev => ({ 
-                            ...prev, 
-                            [type]: file,
-                            [type === 'fotoAntes' ? 'previewAntes' : 'previewDepois']: reader.result
-                        }));
-                    };
-                    reader.readAsDataURL(file);
+            const addItem = () => setItems([...items, { ...initialItemState }]);
+            const removeItem = (index) => {
+                if (items.length > 1) {
+                    const newItems = [...items];
+                    newItems.splice(index, 1);
+                    setItems(newItems);
                 }
             };
 
-            const selectTag = (tag) => {
-                setFormData(prev => ({ ...prev, equipamento: tag }));
-                setSearchTerm(tag);
-                setShowTagList(false);
+            const updateItem = (index, field, value) => {
+                const newItems = [...items];
+                newItems[index][field] = value;
+                setItems(newItems);
             };
+
+            const handleFileChange = (e, index, type) => {
+                const files = Array.from(e.target.files);
+                const newPhotos = [];
+                
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        newPhotos.push(reader.result);
+                        if (newPhotos.length === files.length) {
+                            const updatedItems = [...items];
+                            updatedItems[index][type] = [...updatedItems[index][type], ...newPhotos];
+                            setItems(updatedItems);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            const removePhoto = (itemIndex, type, photoIndex) => {
+                const updatedItems = [...items];
+                updatedItems[itemIndex][type].splice(photoIndex, 1);
+                setItems(updatedItems);
+            };
+
+            const stats = useMemo(() => {
+                // Simplificação do Dashboard para considerar a estrutura de itens
+                let totalLimpos = 0;
+                let totalFerro = 0;
+                const turnosCount = { 'ADM': 0, 'T.C': 0, 'T.A': 0 };
+
+                historyData.forEach(rel => {
+                    const relItems = Array.isArray(rel.items) ? rel.items : [];
+                    relItems.forEach(item => {
+                        totalLimpos += (Number(item.tubosLimpos) || 0);
+                        totalFerro += (Number(item.tubosComFerro) || 0);
+                    });
+                    turnosCount[rel.turno] = (turnosCount[rel.turno] || 0) + relItems.reduce((acc, i) => acc + (Number(i.tubosLimpos) || 0), 0);
+                });
+                return { totalLimpos, totalFerro, turnosCount };
+            }, [historyData]);
 
             const handleSaveToCloud = async () => {
                 setIsSaving(true);
@@ -207,56 +201,51 @@
                         const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
                         
                         await addDoc(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), {
-                            ...formData,
-                            tubosLimpos: Number(formData.tubosLimpos) || 0,
-                            tubosObstruidos: Number(formData.tubosObstruidos) || 0,
-                            tubosComFerro: Number(formData.tubosComFerro) || 0,
+                            ...globalInfo,
+                            items: items.map(it => ({
+                                ...it,
+                                tubosLimpos: Number(it.tubosLimpos) || 0,
+                                tubosObstruidos: Number(it.tubosObstruidos) || 0,
+                                tubosComFerro: Number(it.tubosComFerro) || 0,
+                                fotosAntesCount: it.fotosAntes.length,
+                                fotosDepoisCount: it.fotosDepois.length,
+                                fotosAntes: [], // Não salvamos base64 no Firestore por limite de tamanho
+                                fotosDepois: []
+                            })),
                             userId: user.uid,
-                            createdAt: serverTimestamp(),
-                            temFotoAntes: !!formData.fotoAntes,
-                            temFotoDepois: !!formData.fotoDepois
+                            createdAt: serverTimestamp()
                         });
                         setSaveSuccess(true);
-                    } catch (e) {
-                        console.error("Save Error:", e);
-                    }
-                } else {
-                    setSaveSuccess(true);
-                }
+                    } catch (e) { console.error("Save Error:", e); }
+                } else { setSaveSuccess(true); }
                 setIsSaving(false);
             };
 
             const handleSendWhatsApp = () => {
-                const msg = `*HIDROJATO - ${formData.empresa.toUpperCase()}*%0A` +
-                    `*Atividades Realizadas*%0A` +
-                    `🔹 ${formData.atividade}%0A%0A` +
-                    `*Equipamento:* ${formData.equipamento}%0A` +
-                    `*Turno:* ${formData.turno}%0A` +
-                    `✅ Tubos Limpos: ${formData.tubosLimpos}%0A` +
-                    `${formData.tubosObstruidos ? `❌ Tubos Obstruídos: ${formData.tubosObstruidos}%0A` : ''}` +
-                    `${formData.tubosComFerro ? `⚠️ Tubos com Ferro: ${formData.tubosComFerro}%0A` : ''}` +
-                    `${formData.impactos ? `%0A⚡ *Impactos:* ${formData.impactos}%0A` : ''}` +
-                    `📝 *Obs:* ${formData.observacoes || 'Nenhuma'}%0A%0A` +
-                    `_Relatório gerado via HidroControl_`;
-                
+                let msg = `*HIDROJATO - ${globalInfo.empresa.toUpperCase()}*%0A` +
+                          `*Turno:* ${globalInfo.turno}%0A` +
+                          `*Data:* ${globalInfo.data}%0A%0A`;
+
+                items.forEach((item, idx) => {
+                    msg += `*${idx + 1}. Equipamento:* ${item.equipamento}%0A` +
+                           `✅ Tubos Limpos: ${item.tubosLimpos}%0A` +
+                           `${item.tubosObstruidos ? `❌ Obstruídos: ${item.tubosObstruidos}%0A` : ''}` +
+                           `${item.tubosComFerro ? `⚠️ Com Ferro: ${item.tubosComFerro}%0A` : ''}` +
+                           `📸 Evidências: ${item.fotosAntes.length} Antes / ${item.fotosDepois.length} Depois%0A` +
+                           `${item.impactos ? `⚡ Impacto: ${item.impactos}%0A` : ''}` +
+                           `${item.observacoes ? `📝 Obs: ${item.observacoes}%0A` : ''}%0A`;
+                });
+
+                msg += `_Relatório consolidado via HidroControl_`;
                 window.open(`https://wa.me/?text=${msg}`, '_blank');
                 resetForm();
             };
 
             const resetForm = () => {
-                setFormData(initialFormState);
+                setItems([initialItemState]);
                 setSaveSuccess(false);
-                setSearchTerm('');
                 setView('form');
             };
-
-            useEffect(() => {
-                const handleClickOutside = (e) => {
-                    if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setShowTagList(false);
-                };
-                document.addEventListener('mousedown', handleClickOutside);
-                return () => document.removeEventListener('mousedown', handleClickOutside);
-            }, []);
 
             return (
                 <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-50 shadow-2xl border-x border-slate-200">
@@ -265,39 +254,33 @@
                             <IconClipboard />
                             <h1 className="font-black text-xl tracking-tight leading-none uppercase">Hidro<span className="text-blue-300">Control</span></h1>
                         </div>
-                        <div className="flex flex-col items-end">
-                            <div className="bg-blue-900/40 px-3 py-1 rounded-xl border border-blue-500/50 text-[10px] font-black uppercase tracking-tighter">{formData.data}</div>
-                        </div>
+                        <div className="bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 text-[10px] font-black uppercase tracking-tighter">{globalInfo.data}</div>
                     </header>
 
                     <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-28">
                         {view === 'dashboard' ? (
-                            /* DASHBOARD */
+                            /* DASHBOARD VIEW */
                             <div className="animate-in fade-in duration-500 space-y-6">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100">
-                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Produção Total</p>
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center">
+                                        <p className="text-[10px] font-black uppercase text-slate-400 mb-1 tracking-widest">Produção Acumulada</p>
                                         <h4 className="text-3xl font-black text-blue-700">{stats.totalLimpos}</h4>
                                     </div>
-                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100">
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center">
                                         <p className="text-[10px] font-black uppercase text-red-400 mb-1 tracking-widest italic">Tubos c/ Ferro</p>
                                         <h4 className="text-3xl font-black text-red-600">{stats.totalFerro}</h4>
                                     </div>
                                 </div>
-
                                 <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100">
-                                    <h3 className="text-[10px] font-black uppercase text-slate-500 mb-6 tracking-widest text-center">Desempenho por Turno</h3>
+                                    <h3 className="text-[10px] font-black uppercase text-slate-500 mb-6 tracking-widest text-center">Produção por Turno</h3>
                                     <div className="space-y-5">
                                         {Object.entries(stats.turnosCount).map(([turno, count]) => {
                                             const percentage = stats.totalLimpos > 0 ? (count / stats.totalLimpos) * 100 : 0;
                                             return (
                                                 <div key={turno} className="space-y-1">
-                                                    <div className="flex justify-between text-[10px] font-black uppercase text-slate-400">
-                                                        <span>Turno {turno}</span>
-                                                        <span>{count} Tubos</span>
-                                                    </div>
-                                                    <div className="h-4 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
-                                                        <div className="h-full bg-blue-600 progress-bar rounded-full" style={{ width: `${percentage}%` }}></div>
+                                                    <div className="flex justify-between text-[10px] font-black uppercase text-slate-400"><span>Turno {turno}</span><span>{count}</span></div>
+                                                    <div className="h-3 bg-slate-50 rounded-full overflow-hidden border border-slate-100">
+                                                        <div className="h-full bg-blue-600 progress-bar" style={{ width: `${percentage}%` }}></div>
                                                     </div>
                                                 </div>
                                             );
@@ -306,134 +289,154 @@
                                 </section>
                             </div>
                         ) : view === 'form' ? (
-                            /* FORMULARIO */
+                            /* FORM VIEW */
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
-                                <section>
-                                    <h3 className="text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest text-center">Empresa Responsável</h3>
+                                {/* Informações Globais */}
+                                <section className="space-y-4">
                                     <div className="grid grid-cols-2 gap-3">
                                         {['Montisol', 'Constec'].map(e => (
-                                            <button key={e} onClick={() => setFormData({...formData, empresa: e})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${formData.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>
+                                            <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>
                                         ))}
                                     </div>
-                                </section>
-
-                                <section>
-                                    <h3 className="text-[10px] font-black uppercase text-slate-400 mb-3 tracking-widest text-center">Turno de Operação</h3>
                                     <div className="grid grid-cols-3 gap-3">
                                         {['ADM', 'T.C', 'T.A'].map(t => (
-                                            <button key={t} onClick={() => setFormData({...formData, turno: t})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${formData.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>
+                                            <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-xs transition-all border ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-200' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>
                                         ))}
                                     </div>
                                 </section>
 
-                                <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6" ref={dropdownRef}>
-                                    <div className="relative">
-                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-wider font-black">TAG do Equipamento</label>
-                                        <div className="relative">
-                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><IconSearch /></div>
-                                            <input type="text" placeholder="Pesquisar TAG..." value={searchTerm} onFocus={() => setShowTagList(true)} onChange={(e) => { setSearchTerm(e.target.value); setShowTagList(true); }} className="w-full pl-12 pr-12 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-black text-sm uppercase" />
-                                            {searchTerm && <button onClick={() => {setSearchTerm(''); setShowTagList(true)}} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"><IconX /></button>}
-                                        </div>
-                                        {showTagList && (
-                                            <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-60 overflow-y-auto tag-dropdown ring-1 ring-black/5">
-                                                {filteredTags.map(tag => (
-                                                    <div key={tag} onClick={() => selectTag(tag)} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer">{tag} <div className="w-2 h-2 rounded-full bg-blue-200"></div></div>
-                                                ))}
+                                {/* Lista Dinâmica de Equipamentos */}
+                                <div className="space-y-8">
+                                    {items.map((item, idx) => (
+                                        <div key={idx} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-6 relative animate-in zoom-in-95 duration-200">
+                                            {items.length > 1 && (
+                                                <button onClick={() => removeItem(idx)} className="absolute -top-3 -right-3 bg-red-500 text-white p-2 rounded-full shadow-lg"><IconTrash /></button>
+                                            )}
+                                            
+                                            <div className="relative">
+                                                <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none">Equipamento #{idx + 1}</label>
+                                                <div className="relative">
+                                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><IconSearch /></div>
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Pesquisar TAG..." 
+                                                        value={item.equipamento}
+                                                        onFocus={() => setActiveDropdownIndex(idx)}
+                                                        onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())}
+                                                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-black text-sm"
+                                                    />
+                                                </div>
+                                                {activeDropdownIndex === idx && (
+                                                    <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">
+                                                        {equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (
+                                                            <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 last:border-none font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer">{tag}</div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </div>
 
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Limpos</label><input type="number" name="tubosLimpos" value={formData.tubosLimpos} onChange={handleInputChange} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500 transition-all" /></div>
-                                        <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Obstruídos</label><input type="number" name="tubosObstruidos" value={formData.tubosObstruidos} onChange={handleInputChange} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500 transition-all" /></div>
-                                        <div className="space-y-1"><label className="text-[9px] font-black text-red-500 block uppercase text-center tracking-tighter italic">C/ Ferro</label><input type="number" name="tubosComFerro" value={formData.tubosComFerro} onChange={handleInputChange} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-black text-lg text-red-600 focus:ring-2 focus:ring-red-500 transition-all" /></div>
-                                    </div>
-                                </section>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Limpos</label><input type="number" value={item.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500" /></div>
+                                                <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter">Obstruídos</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500" /></div>
+                                                <div className="space-y-1"><label className="text-[9px] font-black text-red-500 block uppercase text-center tracking-tighter italic">C/ Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-black text-lg text-red-600 focus:ring-2 focus:ring-red-500" /></div>
+                                            </div>
 
-                                <section>
-                                    <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest text-center">Evidências Visuais</h3>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <input type="file" accept="image/*" capture="environment" className="hidden" ref={inputAntesRef} onChange={(e) => handleFileChange(e, 'fotoAntes')} />
-                                        <button onClick={() => inputAntesRef.current.click()} className={`relative aspect-square rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center transition-all shadow-sm overflow-hidden ${formData.fotoAntes ? 'border-green-600 bg-white shadow-green-100' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
-                                            {formData.previewAntes ? <img src={formData.previewAntes} className="image-preview" /> : <><IconCamera /><span className="text-[10px] font-black uppercase mt-3 tracking-widest leading-none text-center">Antes</span></>}
-                                        </button>
-                                        <input type="file" accept="image/*" capture="environment" className="hidden" ref={inputDepoisRef} onChange={(e) => handleFileChange(e, 'fotoDepois')} />
-                                        <button onClick={() => inputDepoisRef.current.click()} className={`relative aspect-square rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center transition-all shadow-sm overflow-hidden ${formData.fotoDepois ? 'border-green-600 bg-white shadow-green-100' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
-                                            {formData.previewDepois ? <img src={formData.previewDepois} className="image-preview" /> : <><IconCamera /><span className="text-[10px] font-black uppercase mt-3 tracking-widest leading-none text-center">Depois</span></>}
-                                        </button>
-                                    </div>
-                                </section>
+                                            {/* Galeria de Fotos */}
+                                            <div className="space-y-4">
+                                                <p className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Evidências do Equipamento</p>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {/* Antes */}
+                                                    <div className="space-y-2">
+                                                        <input type="file" multiple accept="image/*" className="hidden" id={`antes-${idx}`} onChange={(e) => handleFileChange(e, idx, 'fotosAntes')} />
+                                                        <label htmlFor={`antes-${idx}`} className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all">
+                                                            <IconCamera />
+                                                            <span className="text-[9px] font-black uppercase mt-1">Fotos Antes</span>
+                                                        </label>
+                                                        <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto pr-1">
+                                                            {item.fotosAntes.map((pic, pIdx) => (
+                                                                <div key={pIdx} className="relative aspect-square">
+                                                                    <img src={pic} className="image-preview w-full h-full" />
+                                                                    <button onClick={() => removePhoto(idx, 'fotosAntes', pIdx)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><IconX /></button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    {/* Depois */}
+                                                    <div className="space-y-2">
+                                                        <input type="file" multiple accept="image/*" className="hidden" id={`depois-${idx}`} onChange={(e) => handleFileChange(e, idx, 'fotosDepois')} />
+                                                        <label htmlFor={`depois-${idx}`} className="flex flex-col items-center justify-center p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all">
+                                                            <IconCamera />
+                                                            <span className="text-[9px] font-black uppercase mt-1">Fotos Depois</span>
+                                                        </label>
+                                                        <div className="grid grid-cols-2 gap-1 max-h-32 overflow-y-auto pr-1">
+                                                            {item.fotosDepois.map((pic, pIdx) => (
+                                                                <div key={pIdx} className="relative aspect-square">
+                                                                    <img src={pic} className="image-preview w-full h-full" />
+                                                                    <button onClick={() => removePhoto(idx, 'fotosDepois', pIdx)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"><IconX /></button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
 
-                                {/* IMPACTOS E OBSERVAÇÕES - RESTAURADOS */}
-                                <section className="space-y-4">
-                                    <div>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none">Impactos Identificados</label>
-                                        <textarea name="impactos" value={formData.impactos} onChange={handleInputChange} placeholder="Descreva atrasos ou dificuldades..." rows="2" className="w-full p-4 bg-white border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"></textarea>
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none italic">Observações (Opcional)</label>
-                                        <textarea name="observacoes" value={formData.observacoes} onChange={handleInputChange} placeholder="Detalhes adicionais do serviço..." rows="2" className="w-full p-4 bg-white border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"></textarea>
-                                    </div>
-                                </section>
+                                            <div className="space-y-3">
+                                                <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Impactos (Ex: atrasos, bloqueios)..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
+                                                <textarea value={item.observacoes} onChange={(e) => updateItem(idx, 'observacoes', e.target.value)} placeholder="Observações adicionais..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
 
-                                <button onClick={() => setView('preview')} disabled={!formData.equipamento || !formData.tubosLimpos} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all mt-4 disabled:opacity-30">Revisar Relatório</button>
+                                <button onClick={addItem} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 hover:bg-blue-50 transition-all">
+                                    <IconPlus /> Adicionar Novo Equipamento
+                                </button>
+
+                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all mt-4 disabled:opacity-30">Revisar Relatório Consolidado</button>
                             </div>
                         ) : (
-                            /* REVISÃO E AÇÕES */
+                            /* REVISÃO & AÇÕES */
                             <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6 pt-2 text-sm">
-                                <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800">
-                                    <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-3">
-                                        <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo Atividade</h2>
-                                        <span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full">{formData.empresa}</span>
-                                    </div>
-                                    <div className="space-y-4 font-mono">
-                                        <div className="flex justify-between items-center text-slate-300"><span>TAG:</span> <span className="text-white font-black uppercase">{formData.equipamento}</span></div>
-                                        <div className="flex justify-between items-center text-slate-300"><span>Turno:</span> <span>{formData.turno}</span></div>
-                                        <div className="h-px bg-slate-800 my-2"></div>
-                                        <div className="flex justify-between items-center text-green-400"><span>✅ Limpos:</span> <span className="font-black text-xl">{formData.tubosLimpos}</span></div>
-                                        {(Number(formData.tubosObstruidos) > 0) && <div className="flex justify-between items-center text-red-400"><span>❌ Obstruídos:</span> <span>{formData.tubosObstruidos}</span></div>}
-                                        {(Number(formData.tubosComFerro) > 0) && <div className="flex justify-between items-center text-yellow-400 bg-yellow-400/10 p-2 rounded-lg -mx-2"><span>⚠️ Ferro:</span> <span className="font-bold">{formData.tubosComFerro}</span></div>}
+                                <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800 space-y-6">
+                                    <div className="flex justify-between items-start border-b border-slate-800 pb-4">
+                                        <div className="space-y-1">
+                                            <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo de Atividade</h2>
+                                            <p className="text-slate-500 text-[10px] font-bold uppercase">{globalInfo.data} • Turno {globalInfo.turno}</p>
+                                        </div>
+                                        <span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full">{globalInfo.empresa}</span>
                                     </div>
                                     
-                                    {(formData.impactos || formData.observacoes) && (
-                                        <div className="mt-6 pt-4 border-t border-slate-800 space-y-3">
-                                            {formData.impactos && (
-                                                <div className="space-y-1">
-                                                    <p className="text-[9px] text-blue-400 uppercase font-black tracking-widest">Impactos:</p>
-                                                    <p className="text-xs text-slate-300 italic">{formData.impactos}</p>
+                                    <div className="space-y-6">
+                                        {items.map((it, i) => (
+                                            <div key={i} className="font-mono text-xs border-b border-slate-800/50 pb-4 last:border-none">
+                                                <p className="text-blue-300 font-black mb-2 uppercase">{i+1}. {it.equipamento}</p>
+                                                <div className="grid grid-cols-2 gap-y-1 pl-4">
+                                                    <span className="text-slate-500">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos}</span>
+                                                    {it.tubosObstruidos > 0 && <><span className="text-slate-500">Obstruídos:</span> <span className="text-red-400 font-bold">{it.tubosObstruidos}</span></>}
+                                                    {it.tubosComFerro > 0 && <><span className="text-slate-500">Com Ferro:</span> <span className="text-yellow-400 font-bold italic">{it.tubosComFerro}</span></>}
+                                                    <span className="text-slate-500">Fotos:</span> <span className="text-slate-300 italic">{it.fotosAntes.length}A / {it.fotosDepois.length}D</span>
                                                 </div>
-                                            )}
-                                            {formData.observacoes && (
-                                                <div className="space-y-1">
-                                                    <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Observações:</p>
-                                                    <p className="text-xs text-slate-300 italic">{formData.observacoes}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
 
                                 {saveSuccess ? (
                                     <div className="bg-green-50 border border-green-200 p-6 rounded-[2.5rem] text-center space-y-4 animate-bounce">
-                                        <p className="text-green-800 font-black uppercase text-xs tracking-widest">✅ Registro Salvo com Sucesso!</p>
+                                        <p className="text-green-800 font-black uppercase text-xs tracking-widest">✅ Registro Consolidado com Sucesso!</p>
                                         <div className="flex gap-3">
                                             <button onClick={handleSendWhatsApp} className="flex-1 bg-green-600 text-white py-4 rounded-2xl font-black uppercase text-[10px] flex items-center justify-center gap-2"><IconSend /> Enviar WhatsApp</button>
-                                            <button onClick={resetForm} className="flex-1 bg-slate-800 text-white py-4 rounded-2xl font-black uppercase text-[10px]">Novo Registro</button>
+                                            <button onClick={resetForm} className="flex-1 bg-slate-800 text-white py-4 rounded-2xl font-black uppercase text-[10px]">Novo Relatório</button>
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="flex flex-col gap-3">
-                                        <button 
-                                            onClick={handleSaveToCloud} 
-                                            disabled={isSaving}
-                                            className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
-                                        >
-                                            {isSaving ? 'Gravando...' : <><IconSave /> Registrar Informações</>}
+                                        <button onClick={handleSaveToCloud} disabled={isSaving} className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50">
+                                            {isSaving ? 'Processando...' : <><IconSave /> Registrar Tudo na Cloud</>}
                                         </button>
-                                        
                                         <div className="flex gap-4">
                                             <button onClick={() => setView('form')} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400">Editar</button>
-                                            <button onClick={handleSendWhatsApp} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg shadow-green-100"><IconSend /> Apenas Enviar Zap</button>
+                                            <button onClick={handleSendWhatsApp} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg shadow-green-100"><IconSend /> Enviar WhatsApp</button>
                                         </div>
                                     </div>
                                 )}
@@ -447,7 +450,7 @@
                             <span className="text-[8px] font-black uppercase mt-1 tracking-tighter">Relatório</span>
                         </button>
                         <div className="relative -mt-12">
-                            <div className="w-14 h-14 rounded-full bg-blue-800 text-white flex items-center justify-center border-4 border-slate-50 shadow-xl shadow-blue-200">
+                            <div className="w-14 h-14 rounded-full bg-blue-800 text-white flex items-center justify-center border-4 border-slate-50 shadow-xl shadow-blue-200 active:scale-90 transition-all">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                             </div>
                         </div>
