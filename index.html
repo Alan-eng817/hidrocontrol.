@@ -84,6 +84,9 @@
             const chartPieRef = useRef(null);
             const chartBarRef = useRef(null);
 
+            // Variáveis Globais de Ambiente
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
+
             const initialItemState = {
                 equipamento: '',
                 atividade: 'Limpeza de tubos',
@@ -103,9 +106,9 @@
                 turno: 'ADM'
             });
 
-            // Firebase Auth
+            // --- Firebase Setup ---
             useEffect(() => {
-                const initAuth = async () => {
+                const initFirebase = async () => {
                     if (!window.FirebaseSDK) return;
                     const { initializeApp, getFirestore, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = window.FirebaseSDK;
                     try {
@@ -117,40 +120,43 @@
                         const db = getFirestore(app);
                         window.db = db;
 
+                        // Auth FIRST as per Rule 3
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
                         } else {
                             await signInAnonymously(auth);
                         }
-                        onAuthStateChanged(auth, setUser);
-                    } catch (e) { console.error("Erro Auth:", e); }
+                        
+                        const unsubscribe = onAuthStateChanged(auth, setUser);
+                        return () => unsubscribe();
+                    } catch (e) { console.error("Erro Inicialização Firebase:", e); }
                 };
-                initAuth();
+                initFirebase();
             }, []);
 
-            // Data Sync - Accumulates reports automatically
+            // --- Data Synchronization ---
             useEffect(() => {
                 if (!user || !window.db) return;
-                const { collection, query, onSnapshot } = window.FirebaseSDK;
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
+                const { collection, onSnapshot } = window.FirebaseSDK;
                 
+                // Rule 1 Strict Path
                 const colRef = collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios');
                 
                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // Sort in memory to avoid index errors
+                    // Regra 2: Sort in memory
                     data.sort((a, b) => {
                         const dateA = a.createdAt?.seconds || 0;
                         const dateB = b.createdAt?.seconds || 0;
                         return dateB - dateA;
                     });
                     setHistoryData(data);
-                }, (err) => console.error("Erro Sync Firestore:", err));
+                }, (err) => console.error("Erro Sincronização Dados:", err));
                 
                 return () => unsubscribe();
             }, [user]);
 
-            // Dashboard Charts logic
+            // --- Dashboard KPI & Charts ---
             useEffect(() => {
                 if (view === 'dashboard' && historyData.length > 0) {
                     const renderCharts = () => {
@@ -185,7 +191,7 @@
                                     responsive: true, 
                                     maintainAspectRatio: false,
                                     cutout: '70%', 
-                                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } } 
+                                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } 
                                 }
                             });
                         }
@@ -207,7 +213,10 @@
                                 options: { 
                                     responsive: true, 
                                     maintainAspectRatio: false,
-                                    scales: { y: { beginAtZero: true, ticks: { font: { size: 9 } } }, x: { ticks: { font: { size: 9 } } } }, 
+                                    scales: { 
+                                        y: { beginAtZero: true, ticks: { font: { size: 9 } } }, 
+                                        x: { ticks: { font: { size: 9 } } } 
+                                    }, 
                                     plugins: { legend: { display: false } } 
                                 }
                             });
@@ -252,20 +261,11 @@
             };
 
             const handleSaveToCloud = async () => {
-                if (!user || !window.db) {
-                    setSaveSuccess(true);
-                    setTimeout(() => {
-                        setView('dashboard');
-                        setSaveSuccess(false);
-                        setItems([{ ...initialItemState }]);
-                    }, 1500);
-                    return;
-                }
+                if (!user || !window.db) return;
                 
                 setIsSaving(true);
                 try {
                     const { collection, addDoc, serverTimestamp } = window.FirebaseSDK;
-                    const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-default';
                     
                     const payload = {
                         ...globalInfo,
@@ -282,18 +282,20 @@
                         createdAt: serverTimestamp()
                     };
 
-                    await addDoc(collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios'), payload);
+                    const colRef = collection(window.db, 'artifacts', appId, 'public', 'data', 'relatorios');
+                    await addDoc(colRef, payload);
                     
                     setSaveSuccess(true);
-                    // Redirect to dashboard after a short delay showing success
+                    
+                    // Auto-redirect to Dashboard after success msg
                     setTimeout(() => {
-                        setView('dashboard');
                         setSaveSuccess(false);
-                        setItems([{ ...initialItemState }]); // Reset for next report
-                    }, 1500);
+                        setItems([{ ...initialItemState }]); 
+                        setView('dashboard');
+                    }, 2000);
 
                 } catch (e) { 
-                    console.error("Erro ao salvar dados:", e);
+                    console.error("Erro crítico ao salvar:", e);
                 } finally {
                     setIsSaving(false);
                 }
@@ -369,6 +371,7 @@
                                     <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Painel Operacional</h2>
                                     <button 
                                         onClick={handleExportCSV} 
+                                        disabled={historyData.length === 0}
                                         className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-lg border uppercase transition-all ${historyData.length > 0 ? 'text-blue-700 bg-blue-50 border-blue-100 hover:bg-blue-100 shadow-sm' : 'text-slate-300 bg-slate-50 border-slate-100 cursor-not-allowed'}`}
                                     >
                                         <IconDownload /> Exportar Excel
@@ -376,11 +379,11 @@
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all hover:shadow-md">
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all">
                                         <p className="text-[10px] font-black uppercase text-slate-400 mb-1">Limpos Acumulado</p>
                                         <h4 className="text-3xl font-black text-blue-700">{totalLimposGeral}</h4>
                                     </div>
-                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all hover:shadow-md">
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all">
                                         <p className="text-[10px] font-black uppercase text-red-400 mb-1">Total Ferro</p>
                                         <h4 className="text-3xl font-black text-red-600">{totalFerroGeral}</h4>
                                     </div>
@@ -393,23 +396,23 @@
                                     </div>
                                     <div className="pt-6 border-t border-slate-50">
                                         <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-center mb-4">Produção por Turno</h3>
-                                        <div className="w-full h-[160px] relative"><canvas id="barChart"></canvas></div>
+                                        <div className="w-full h-[140px] relative"><canvas id="barChart"></canvas></div>
                                     </div>
                                 </div>
 
                                 <section className="space-y-3">
-                                    <h3 className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Atividade Recente</h3>
+                                    <h3 className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Actividade Recente (Cloud)</h3>
                                     {historyData.slice(0, 5).map((rel, rIdx) => (
-                                        <div key={rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-left">
+                                        <div key={rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm">
                                             <div>
                                                 <p className="text-xs font-black text-slate-700">{rel.data} - Turno {rel.turno}</p>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{rel.items?.length || 0} TAGs acumuladas</p>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{rel.items?.length || 0} Equipamentos Registados</p>
                                             </div>
                                             <div className="text-blue-700 font-black text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md">{rel.empresa}</div>
                                         </div>
                                     ))}
                                     {historyData.length === 0 && (
-                                        <div className="text-center py-8 text-slate-400 italic text-xs uppercase tracking-widest opacity-50">Sincronizando dados...</div>
+                                        <div className="text-center py-8 text-slate-400 italic text-xs uppercase tracking-widest opacity-50">Sem dados sincronizados...</div>
                                     )}
                                 </section>
                             </div>
@@ -499,12 +502,12 @@
                             /* PREVIEW */
                             <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6 pt-2 text-sm relative">
                                 {saveSuccess && (
-                                    <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6 bg-blue-800/90 backdrop-blur-sm rounded-[3rem]">
-                                        <div className="bg-white p-8 rounded-[3rem] text-center space-y-4 shadow-2xl">
-                                            <div className="bg-green-500 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl"><IconCheck /></div>
+                                    <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6 bg-blue-800/95 backdrop-blur-md rounded-[3rem]">
+                                        <div className="bg-white p-8 rounded-[3rem] text-center space-y-4 shadow-2xl border border-blue-100">
+                                            <div className="bg-green-500 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl scale-110"><IconCheck /></div>
                                             <div>
-                                                <h3 className="text-blue-900 font-black uppercase tracking-tight">Salvo com Sucesso!</h3>
-                                                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Redirecionando para o Dashboard...</p>
+                                                <h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Registo com Sucesso!</h3>
+                                                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">A carregar o Dashboard...</p>
                                             </div>
                                         </div>
                                     </div>
@@ -524,8 +527,8 @@
                                             <div key={i} className="font-mono text-xs border-b border-slate-800/50 pb-4 last:border-none">
                                                 <p className="text-blue-300 font-black mb-2 uppercase">{i+1}. TAG: {it.equipamento}</p>
                                                 <div className="grid grid-cols-2 gap-y-1.5 pl-3">
-                                                    <span className="text-slate-500">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span>
-                                                    <span className="text-slate-500">Fotos:</span> <span className="text-slate-300 italic">{it.fotosAntes.length}A / {it.fotosDepois.length}D</span>
+                                                    <span className="text-slate-500 italic uppercase text-[9px]">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span>
+                                                    <span className="text-slate-500 italic uppercase text-[9px]">Média Fotos:</span> <span className="text-slate-300">{it.fotosAntes.length + it.fotosDepois.length} total</span>
                                                 </div>
                                             </div>
                                         ))}
@@ -535,18 +538,19 @@
                                 <div className="flex flex-col gap-3">
                                     <button 
                                         onClick={handleSaveToCloud} 
-                                        disabled={isSaving || saveSuccess} 
+                                        disabled={isSaving || saveSuccess || !user} 
                                         className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
                                     >
-                                        {isSaving ? 'Gravando dados...' : <><IconSave /> Registrar na Nuvem</>}
+                                        {isSaving ? 'A Processar...' : <><IconSave /> Confirmar e Gravar na Cloud</>}
                                     </button>
                                     
                                     <div className="flex gap-4">
                                         <button onClick={() => setView('form')} disabled={saveSuccess} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400 shadow-sm transition-all hover:bg-slate-50">Editar</button>
                                         <button onClick={handleSendWhatsApp} disabled={saveSuccess} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg transition-all hover:bg-green-600">
-                                            <IconSend /> Enviar WhatsApp
+                                            <IconSend /> Partilhar WhatsApp
                                         </button>
                                     </div>
+                                    {!user && <p className="text-center text-[9px] text-red-400 font-bold uppercase animate-pulse">A aguardar ligação à nuvem para gravar...</p>}
                                 </div>
                             </div>
                         )}
@@ -559,7 +563,7 @@
                         </button>
                         <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
                             <IconChart />
-                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">Dashboard</span>
+                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter font-bold">Dashboard</span>
                         </button>
                     </nav>
                 </div>
