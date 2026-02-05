@@ -64,7 +64,7 @@
             const chartPieRef = useRef(null);
             const chartBarRef = useRef(null);
             
-            // Constante estrita de identificação
+            // Constante estrita de identificação - Alterada para garantir nova pasta limpa
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-alumar-v1-prod';
 
             const initialItemState = {
@@ -84,18 +84,18 @@
                 turno: 'ADM'
             });
 
-            // --- Autenticação ---
+            // --- Regra 3: Autenticação Prioritária e Await ---
             useEffect(() => {
                 const initialize = async () => {
+                    // Espera pelo SDK no mobile
                     let count = 0;
-                    while (!window.FB_CORE && count < 30) {
+                    while (!window.FB_CORE && count < 50) {
                         await new Promise(r => setTimeout(r, 100));
                         count++;
                     }
 
                     if (!window.FB_CORE) {
-                        setUser({ uid: 'local-user', isLocal: true });
-                        setSyncStatus('Modo Offline');
+                        setSyncStatus('Erro de Carregamento');
                         return;
                     }
 
@@ -104,32 +104,34 @@
                     try {
                         const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
                         if (!configStr) {
-                            setUser({ uid: 'guest', isLocal: true });
-                            setSyncStatus('Sem config');
+                            setSyncStatus('Configuração Ausente');
                             return;
                         }
 
                         const config = JSON.parse(configStr);
-                        const app = initializeApp(config);
-                        const auth = getAuth(app);
-                        const firestore = getFirestore(app);
-                        setDb(firestore);
+                        const appInstance = initializeApp(config);
+                        const authInstance = getAuth(appInstance);
+                        const firestoreInstance = getFirestore(appInstance);
+                        setDb(firestoreInstance);
 
+                        // Autentica ANTES de guardar o user
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
+                            await signInWithCustomToken(authInstance, __initial_auth_token);
                         } else {
-                            await signInAnonymously(auth);
+                            await signInAnonymously(authInstance);
                         }
 
-                        onAuthStateChanged(auth, (u) => {
+                        onAuthStateChanged(authInstance, (u) => {
                             if (u) {
                                 setUser(u);
                                 setSyncStatus('Ligado');
+                            } else {
+                                setSyncStatus('Falha de Login');
                             }
                         });
                     } catch (e) {
-                        setUser({ uid: 'local-err', isLocal: true });
-                        setSyncStatus('Erro de rede');
+                        console.error("Auth Erro:", e);
+                        setSyncStatus('Erro Crítico');
                     }
                 };
                 initialize();
@@ -137,16 +139,20 @@
 
             // --- Sincronização de Dados (Regra 1 e 2) ---
             useEffect(() => {
+                // SÓ corre se tiver user e db
                 if (!user || !db || !window.FB_CORE) return;
                 const { collection, onSnapshot } = window.FB_CORE;
                 
-                // REGRA 1: Caminho estrito
+                // REGRA 1: Caminho estrito público
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'relatorios');
                 
                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    const data = snapshot.docs.map(doc => ({ 
+                        id: doc.id, 
+                        ...doc.data() 
+                    }));
                     
-                    // REGRA 2: Ordenação manual robusta
+                    // REGRA 2: Ordenação manual em memória (mais estável)
                     data.sort((a, b) => {
                         const tA = a.localTimestamp || a.createdAt?.seconds || 0;
                         const tB = b.localTimestamp || b.createdAt?.seconds || 0;
@@ -156,8 +162,8 @@
                     setHistoryData(data);
                     setSyncStatus('Actualizado');
                 }, (err) => {
-                    console.error("Erro no listener:", err);
-                    setSyncStatus('Erro Permissão');
+                    console.error("Listener Erro:", err);
+                    setSyncStatus('Erro de Permissão');
                 });
                 
                 return () => unsubscribe();
@@ -182,10 +188,11 @@
                 return { limpos, ferro, turnosMap };
             }, [historyData]);
 
-            // --- Gráficos ---
+            // --- Gráficos do Dashboard ---
             useEffect(() => {
                 if (view === 'dashboard' && historyData.length > 0) {
                     const timer = setTimeout(() => {
+                        // Dados acumulados para o gráfico de pizza
                         let tLimpos = 0, tObstruidos = 0, tFerro = 0;
                         historyData.forEach(rel => {
                             (rel.items || []).forEach(it => {
@@ -204,7 +211,7 @@
                                     labels: ['Limpos', 'Obstruídos', 'Com Ferro'],
                                     datasets: [{ data: [tLimpos, tObstruidos, tFerro], backgroundColor: ['#22c55e', '#ef4444', '#f59e0b'], borderWidth: 0 }]
                                 },
-                                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } }
+                                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11, weight: 'bold' } } } } }
                             });
                         }
 
@@ -219,10 +226,15 @@
                                         label: 'Tubos',
                                         data: [stats.turnosMap['ADM'], stats.turnosMap['T.C'], stats.turnosMap['T.A']],
                                         backgroundColor: '#1e40af',
-                                        borderRadius: 6
+                                        borderRadius: 8
                                     }]
                                 },
-                                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } }
+                                options: { 
+                                    responsive: true, 
+                                    maintainAspectRatio: false, 
+                                    scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 11, weight: 'bold' } } } }, 
+                                    plugins: { legend: { display: false } } 
+                                }
                             });
                         }
                     }, 500);
@@ -248,20 +260,29 @@
                 files.forEach(file => {
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                        const updated = [...items];
-                        const list = updated[index][type] || [];
-                        updated[index][type] = [...list, reader.result];
-                        setItems(updated);
+                        setItems(prev => {
+                            const updated = [...prev];
+                            const list = Array.isArray(updated[index][type]) ? updated[index][type] : [];
+                            updated[index] = { ...updated[index], [type]: [...list, reader.result] };
+                            return updated;
+                        });
                     };
                     reader.readAsDataURL(file);
                 });
             };
 
             const handleSaveToCloud = async () => {
-                if (!user) return;
+                // Bloqueia se não estiver autenticado de verdade
+                if (!user || syncStatus === 'A conectar...') {
+                    alert("Aguarde a conexão com a nuvem ser estabelecida.");
+                    return;
+                }
+                
                 setIsSaving(true);
                 
                 try {
+                    const { collection, addDoc, serverTimestamp } = window.FB_CORE;
+                    
                     const payload = {
                         ...globalInfo,
                         items: items.map(it => ({
@@ -273,25 +294,23 @@
                             fotosCount: (it.fotosAntes?.length || 0) + (it.fotosDepois?.length || 0)
                         })),
                         userId: user.uid,
-                        localTimestamp: Date.now()
+                        localTimestamp: Date.now(),
+                        createdAt: serverTimestamp() // Timestamp do servidor
                     };
 
-                    if (db && !user.isLocal) {
-                        const { collection, addDoc, serverTimestamp } = window.FB_CORE;
-                        payload.createdAt = serverTimestamp();
-                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'relatorios'), payload);
-                    }
+                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'relatorios');
+                    await addDoc(colRef, payload);
                     
                     setSaveSuccess(true);
                     setTimeout(() => {
                         setSaveSuccess(false);
                         setItems([{ ...initialItemState }]); 
-                        setView('dashboard');
+                        setView('dashboard'); // Redireciona para ver o dado aparecer
                     }, 3000);
 
                 } catch (e) { 
-                    setSaveSuccess(true);
-                    setTimeout(() => { setSaveSuccess(false); setView('dashboard'); }, 1500);
+                    console.error("Erro ao gravar:", e);
+                    alert("Falha técnica ao gravar. Verifique sua rede.");
                 } finally {
                     setIsSaving(false);
                 }
@@ -308,7 +327,7 @@
                 const blob = new Blob([rows.join("\n")], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
                 link.href = URL.createObjectURL(blob);
-                link.download = `hidrocontrol_excel.csv`;
+                link.download = `hidrocontrol_acumulado_${new Date().toISOString().split('T')[0]}.csv`;
                 link.click();
             };
 
@@ -329,7 +348,7 @@
                         </div>
                         <div className="flex flex-col items-end">
                             <div className="text-[10px] font-black bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 uppercase leading-none mb-1">{globalInfo.data}</div>
-                            <div className={`text-[8px] font-bold uppercase tracking-widest ${syncStatus === 'Ligado' || syncStatus === 'Actualizado' ? 'text-green-400' : 'text-yellow-400'}`}>{syncStatus}</div>
+                            <div className={`text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${syncStatus === 'Ligado' || syncStatus === 'Actualizado' ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>{syncStatus}</div>
                         </div>
                     </header>
 
@@ -339,7 +358,7 @@
                                 <div className="flex justify-between items-center">
                                     <div className="flex flex-col">
                                         <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Visão de Produção</h2>
-                                        <span className="text-[9px] font-bold text-blue-600 uppercase mt-1 tracking-tighter">{historyData.length} registos encontrados</span>
+                                        <span className="text-[9px] font-bold text-blue-600 uppercase mt-1 tracking-tighter">{historyData.length} registos sincronizados</span>
                                     </div>
                                     <button onClick={handleExportCSV} disabled={historyData.length === 0} className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-lg border uppercase transition-all ${historyData.length > 0 ? 'text-blue-700 bg-blue-50 border-blue-100 hover:bg-blue-100 shadow-sm' : 'text-slate-300 opacity-50'}`}><IconDownload /> Excel</button>
                                 </div>
@@ -377,7 +396,7 @@
                                             <div className="text-blue-700 font-bold text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md border border-blue-100 leading-none">{rel.empresa}</div>
                                         </div>
                                     ))}
-                                    {historyData.length === 0 && <div className="text-center py-10 opacity-40 italic text-[10px] uppercase tracking-widest">Sincronizando Dashboard...</div>}
+                                    {historyData.length === 0 && <div className="text-center py-10 opacity-40 italic text-[10px] uppercase tracking-widest">A aguardar dados da nuvem...</div>}
                                 </section>
                             </div>
                         ) : view === 'form' ? (
@@ -440,7 +459,7 @@
                                                     </div>
                                                 ))}
                                             </div>
-                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva dificuldades ou ocorrências..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium transition-all shadow-inner"></textarea>
+                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva dificuldades identificadas..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium transition-all shadow-inner"></textarea>
                                         </div>
                                     ))}
                                 </div>
@@ -456,8 +475,8 @@
                                         <div className="bg-white p-10 rounded-[3rem] text-center space-y-4 shadow-2xl border border-blue-100 scale-110">
                                             <div className="bg-green-500 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl scale-110"><IconCheck /></div>
                                             <div>
-                                                <h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Arquivado com Sucesso!</h3>
-                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 leading-tight">O histórico industrial foi actualizado.<br/>Sincronizando Dashboard...</p>
+                                                <h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Registo Arquivado!</h3>
+                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 leading-tight">O histórico industrial foi actualizado.<br/>Actualizando Dashboard...</p>
                                             </div>
                                         </div>
                                     </div>
@@ -491,16 +510,16 @@
                                         disabled={isSaving || saveSuccess || !user} 
                                         className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50 leading-none"
                                     >
-                                        {isSaving ? 'A Processar...' : <><IconSave /> Finalizar e Gravar na Cloud</>}
+                                        {isSaving ? 'Gravando...' : <><IconSave /> Finalizar e Gravar na Cloud</>}
                                     </button>
                                     
                                     <div className="flex gap-4">
                                         <button onClick={() => setView('form')} disabled={saveSuccess} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400 shadow-sm transition-all hover:bg-slate-50 leading-none">Editar</button>
                                         <button onClick={handleSendWhatsApp} disabled={saveSuccess} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg transition-all hover:bg-green-600 leading-none">
-                                            <IconSend /> Partilhar no WhatsApp
+                                            <IconSend /> WhatsApp
                                         </button>
                                     </div>
-                                    {!user && <p className="text-center text-[9px] text-red-400 font-black uppercase animate-pulse mt-2 tracking-widest leading-none">A aguardar ligação estável com a nuvem...</p>}
+                                    {!user && <p className="text-center text-[9px] text-red-400 font-black uppercase animate-pulse mt-2 tracking-widest leading-none">A aguardar ligação à nuvem...</p>}
                                 </div>
                             </div>
                         )}
