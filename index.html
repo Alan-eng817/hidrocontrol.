@@ -1,4 +1,4 @@
-<<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -17,19 +17,20 @@
         import { getFirestore, collection, addDoc, serverTimestamp, query, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        window.FirebaseSDK = { 
-            initializeApp, 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            serverTimestamp, 
-            query, 
-            onSnapshot, 
-            getAuth, 
-            signInAnonymously, 
-            onAuthStateChanged,
-            signInWithCustomToken
-        };
+        // Inicialização Global para evitar atrasos de estado
+        let app, auth, db;
+        try {
+            const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
+            if (configStr) {
+                const firebaseConfig = JSON.parse(configStr);
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                window.FirebaseInstance = { app, auth, db, collection, addDoc, serverTimestamp, query, onSnapshot, signInAnonymously, signInWithCustomToken, onAuthStateChanged };
+            }
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
+        }
     </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -39,10 +40,7 @@
         input[type="number"]::-webkit-inner-spin-button, 
         input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .tag-dropdown { animation: slideDown 0.2s ease-out; }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
         .image-preview { object-fit: cover; width: 100%; height: 100%; border-radius: 1rem; }
         .progress-bar { transition: width 0.5s ease-in-out; }
         .success-overlay { animation: fadeIn 0.4s ease-out forwards; }
@@ -71,8 +69,6 @@
         const App = () => {
             const [view, setView] = useState('form'); 
             const [user, setUser] = useState(null);
-            const [db, setDb] = useState(null);
-            const [isSaving, setIsSaving] = useState(false);
             const [historyData, setHistoryData] = useState([]);
             const [saveSuccess, setSaveSuccess] = useState(false);
             const [errorMessage, setErrorMessage] = useState('');
@@ -81,7 +77,7 @@
             const chartPieRef = useRef(null);
             const chartBarRef = useRef(null);
 
-            // Regra 1: appId para caminhos estritos
+            // Regra 1: Caminho estrito usando o appId
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-alumar-final-v1';
 
             const initialItemState = {
@@ -102,30 +98,18 @@
                 turno: 'ADM'
             });
 
-            // --- Regra 3: Autenticação FIRST e Await ---
+            // --- Inicialização Resiliente ---
             useEffect(() => {
-                const initAuth = async () => {
-                    if (!window.FirebaseSDK) {
-                        setUser({ uid: 'guest-' + Date.now(), isLocal: true });
+                const checkFirebase = async () => {
+                    if (!window.FirebaseInstance) {
+                        // Modo Local se não houver Firebase
+                        setUser({ uid: 'local-' + Date.now(), isLocal: true });
                         return;
                     }
-                    
-                    const { initializeApp, getFirestore, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = window.FirebaseSDK;
+
+                    const { auth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } = window.FirebaseInstance;
                     
                     try {
-                        const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-                        if (!firebaseConfigStr) {
-                            setUser({ uid: 'guest-local', isLocal: true });
-                            return;
-                        }
-
-                        const firebaseConfig = JSON.parse(firebaseConfigStr);
-                        const app = initializeApp(firebaseConfig);
-                        const auth = getAuth(app);
-                        const firestoreDb = getFirestore(app);
-                        setDb(firestoreDb);
-
-                        // Prioridade para Token de Ambiente, senão Anónimo
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(auth, __initial_auth_token);
                         } else {
@@ -134,41 +118,37 @@
 
                         onAuthStateChanged(auth, (u) => {
                             if (u) setUser(u);
+                            else setUser({ uid: 'local-' + Date.now(), isLocal: true });
                         });
                     } catch (e) {
-                        console.error("Firebase Auth Error:", e);
-                        setUser({ uid: 'guest-emergency', isLocal: true });
+                        setUser({ uid: 'guest-' + Date.now(), isLocal: true });
                     }
                 };
-                initAuth();
+                checkFirebase();
             }, []);
 
-            // --- Regra 2: Sincronização de Dados sem queries complexas ---
+            // --- Sincronização de Dados Acumulados ---
             useEffect(() => {
-                if (!user || !db) return;
-                const { collection, onSnapshot } = window.FirebaseSDK;
+                if (!user || !window.FirebaseInstance) return;
+                const { db, collection, onSnapshot } = window.FirebaseInstance;
                 
-                // Caminho estrito conforme Regra 1
-                const colPath = `/artifacts/${appId}/public/data/relatorios`;
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'relatorios');
                 
                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    // Ordenação manual em memória para evitar erro de índice no Firestore
+                    // Ordenação manual em memória para evitar erro de índice (Regra 2)
                     data.sort((a, b) => {
                         const tA = a.createdAt?.seconds || a.localTimestamp || 0;
                         const tB = b.createdAt?.seconds || b.localTimestamp || 0;
                         return tB - tA;
                     });
                     setHistoryData(data);
-                }, (err) => {
-                    console.error("Erro ao carregar dados:", err);
-                });
+                }, (err) => console.error("Erro Sync:", err));
                 
                 return () => unsubscribe();
-            }, [user, db]);
+            }, [user]);
 
-            // Dashboard KPI & Gráficos
+            // Dashboard Charts
             useEffect(() => {
                 if (view === 'dashboard' && historyData.length > 0) {
                     const timer = setTimeout(() => {
@@ -177,11 +157,11 @@
 
                         historyData.forEach(rel => {
                             (rel.items || []).forEach(it => {
-                                const limpos = Number(it.tubosLimpos) || 0;
-                                tLimpos += limpos;
+                                const l = Number(it.tubosLimpos) || 0;
+                                tLimpos += l;
                                 tObstruidos += (Number(it.tubosObstruidos) || 0);
                                 tFerro += (Number(it.tubosComFerro) || 0);
-                                if (turnos[rel.turno] !== undefined) turnos[rel.turno] += limpos;
+                                if (turnos[rel.turno] !== undefined) turnos[rel.turno] += l;
                             });
                         });
 
@@ -194,7 +174,7 @@
                                     labels: ['Limpos', 'Obstruídos', 'Com Ferro'],
                                     datasets: [{ data: [tLimpos, tObstruidos, tFerro], backgroundColor: ['#22c55e', '#ef4444', '#f59e0b'], borderWidth: 0 }]
                                 },
-                                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, weight: 'bold' } } } } }
+                                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
                             });
                         }
 
@@ -205,9 +185,9 @@
                                 type: 'bar',
                                 data: {
                                     labels: ['ADM', 'T.C', 'T.A'],
-                                    datasets: [{ label: 'Tubos', data: [turnos['ADM'], turnos['T.C'], turnos['T.A']], backgroundColor: '#1e40af', borderRadius: 8 }]
+                                    datasets: [{ label: 'Tubos', data: [turnos['ADM'], turnos['T.C'], turnos['T.A']], backgroundColor: '#1e40af', borderRadius: 6 }]
                                 },
-                                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true }, x: { ticks: { font: { size: 10, weight: 'bold' } } } }, plugins: { legend: { display: false } } }
+                                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true }, x: { ticks: { font: { size: 10 } } } }, plugins: { legend: { display: false } } }
                             });
                         }
                     }, 400);
@@ -230,17 +210,25 @@
                 setItems(newItems);
             };
 
+            const handleFileChange = (e, index, type) => {
+                const files = Array.from(e.target.files);
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const updatedItems = [...items];
+                        updatedItems[index][type] = [...updatedItems[index][type], reader.result];
+                        setItems(updatedItems);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
+
             const handleSaveToCloud = async () => {
-                if (!user || !db) {
-                    setErrorMessage("Erro: Ligação à nuvem não disponível.");
-                    return;
-                }
+                if (!user) return;
                 setIsSaving(true);
                 setErrorMessage('');
                 
                 try {
-                    const { collection, addDoc, serverTimestamp } = window.FirebaseSDK;
-                    
                     const payload = {
                         ...globalInfo,
                         items: items.map(it => ({
@@ -253,12 +241,15 @@
                             fotosCount: (it.fotosAntes?.length || 0) + (it.fotosDepois?.length || 0)
                         })),
                         userId: user.uid,
-                        localTimestamp: Date.now(),
-                        createdAt: serverTimestamp()
+                        localTimestamp: Date.now()
                     };
 
-                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'relatorios');
-                    await addDoc(colRef, payload);
+                    if (window.FirebaseInstance?.db && !user.isLocal) {
+                        const { collection, addDoc, serverTimestamp } = window.FirebaseInstance;
+                        payload.createdAt = serverTimestamp();
+                        const colRef = collection(window.FirebaseInstance.db, 'artifacts', appId, 'public', 'data', 'relatorios');
+                        await addDoc(colRef, payload);
+                    }
                     
                     setSaveSuccess(true);
                     setTimeout(() => {
@@ -268,8 +259,10 @@
                     }, 3000);
 
                 } catch (e) { 
-                    console.error("Erro Crítico de Gravação:", e);
-                    setErrorMessage("Falha ao gravar na nuvem. Verifique a internet.");
+                    console.error("Erro Gravação:", e);
+                    setErrorMessage("Erro ao ligar ao servidor. Verifique a internet.");
+                    // Fallback para permitir ver o Dash mesmo com erro
+                    setTimeout(() => setView('dashboard'), 2000);
                 } finally {
                     setIsSaving(false);
                 }
@@ -291,7 +284,7 @@
                 const blob = new Blob([csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
                 link.setAttribute("href", URL.createObjectURL(blob));
-                link.setAttribute("download", `hidrocontrol_excel_${new Date().toISOString().split('T')[0]}.csv`);
+                link.setAttribute("download", `hidrocontrol_relatorio.csv`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -327,15 +320,15 @@
                             <div className="animate-in fade-in duration-500 space-y-6">
                                 <div className="flex justify-between items-center mb-2">
                                     <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Dados Acumulados</h2>
-                                    <button onClick={handleExportCSV} disabled={historyData.length === 0} className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-lg border uppercase transition-all ${historyData.length > 0 ? 'text-blue-700 bg-blue-50 border-blue-100 hover:bg-blue-100 shadow-sm' : 'text-slate-300 opacity-50 cursor-not-allowed'}`}><IconDownload /> Exportar Excel</button>
+                                    <button onClick={handleExportCSV} disabled={historyData.length === 0} className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-lg border uppercase transition-all ${historyData.length > 0 ? 'text-blue-700 bg-blue-50 border-blue-100' : 'text-slate-300 opacity-50'}`}><IconDownload /> Exportar Excel</button>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all hover:shadow-md">
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all">
                                         <p className="text-[10px] font-black uppercase text-slate-400 mb-1 leading-none">Tubos Limpos</p>
                                         <h4 className="text-3xl font-black text-blue-700">{historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosLimpos) || 0), 0), 0)}</h4>
                                     </div>
-                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all hover:shadow-md">
+                                    <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 text-center transition-all">
                                         <p className="text-[10px] font-black uppercase text-red-400 mb-1 leading-none tracking-tighter">Tubos c/ Ferro</p>
                                         <h4 className="text-3xl font-black text-red-600">{historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + (Number(i.tubosComFerro) || 0), 0), 0)}</h4>
                                     </div>
@@ -343,21 +336,20 @@
 
                                 <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 space-y-8">
                                     <div className="text-center"><h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-4 font-bold uppercase">Qualidade Total</h3><div className="w-full h-[180px] relative"><canvas id="pieChart"></canvas></div></div>
-                                    <div className="pt-6 border-t border-slate-50"><h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-center mb-4 font-bold uppercase">Produtividade por Turno</h3><div className="w-full h-[140px] relative"><canvas id="barChart"></canvas></div></div>
+                                    <div className="pt-6 border-t border-slate-50"><h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest text-center mb-4 font-bold uppercase">Produção p/ Turno</h3><div className="w-full h-[140px] relative"><canvas id="barChart"></canvas></div></div>
                                 </div>
 
                                 <section className="space-y-3">
-                                    <h3 className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest uppercase">Histórico Recente</h3>
+                                    <h3 className="text-[10px] font-black uppercase text-slate-400 text-center tracking-widest">Atividade Recente (Nuvem)</h3>
                                     {historyData.slice(0, 10).map((rel, rIdx) => (
                                         <div key={rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm animate-in slide-in-from-left duration-300">
                                             <div className="flex flex-col">
                                                 <p className="text-xs font-black text-slate-700">{rel.data} - {rel.turno}</p>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{(rel.items || []).length} TAGs Registadas</p>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{(rel.items || []).length} Equipamentos Registados</p>
                                             </div>
-                                            <div className="text-blue-700 font-black text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md border border-blue-100 leading-none">{rel.empresa}</div>
+                                            <div className="text-blue-700 font-black text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md border border-blue-100">{rel.empresa}</div>
                                         </div>
                                     ))}
-                                    {historyData.length === 0 && <div className="text-center py-10 opacity-40 italic text-xs uppercase tracking-widest">A carregar dados da cloud...</div>}
                                 </section>
                             </div>
                         ) : view === 'form' ? (
@@ -379,12 +371,17 @@
                                                 <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 block uppercase text-center tracking-tighter leading-none">Obstruídos</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-black text-lg focus:ring-2 focus:ring-blue-500 transition-all" /></div>
                                                 <div className="space-y-1"><label className="text-[9px] font-black text-red-500 block uppercase text-center tracking-tighter italic font-bold leading-none">C/ Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50/30 border border-red-100 rounded-2xl text-center font-black text-lg text-red-600 focus:ring-2 focus:ring-red-500 transition-all" /></div>
                                             </div>
-                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Dificuldades ou impactos..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {['fotosAntes', 'fotosDepois'].map(type => (
+                                                    <div key={type} className="space-y-2"><input type="file" multiple accept="image/*" className="hidden" id={`${type}-${idx}`} onChange={(e) => handleFileChange(e, idx, type)} /><label htmlFor={`${type}-${idx}`} className="flex flex-col items-center justify-center p-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all"><IconCamera /><span className="text-[9px] font-black uppercase mt-1 tracking-tighter">{type.includes('Antes') ? 'Antes' : 'Depois'}</span></label><div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto">{item[type].map((pic, pIdx) => (<div key={pIdx} className="relative aspect-square border border-slate-100 rounded-xl overflow-hidden shadow-sm"><img src={pic} className="image-preview w-full h-full" /><button onClick={() => { const n = [...items]; n[idx][type].splice(pIdx,1); setItems(n); }} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 scale-75 shadow-md"><IconX /></button></div>))}</div></div>
+                                                ))}
+                                            </div>
+                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Impactos identificados..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"></textarea>
                                         </div>
                                     ))}
                                 </div>
                                 
-                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-blue-50 shadow-md transition-all active:scale-95"><IconPlus /> Adicionar Outro Equipamento</button>
+                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all"><IconPlus /> Adicionar Outro TAG</button>
                                 <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.15em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all disabled:opacity-30">Revisar Relatório</button>
                             </div>
                         ) : (
@@ -394,7 +391,7 @@
                                     <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6 bg-blue-800/95 backdrop-blur-md rounded-[3rem]">
                                         <div className="bg-white p-10 rounded-[3rem] text-center space-y-4 shadow-2xl border border-blue-100 scale-110">
                                             <div className="bg-green-500 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl scale-110"><IconCheck /></div>
-                                            <div><h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Sincronizado!</h3><p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 leading-tight">Relatório arquivado na nuvem.<br/>Actualizando o Dashboard...</p></div>
+                                            <div><h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Registo Guardado!</h3><p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 leading-tight">Sincronizando Dashboard...</p></div>
                                         </div>
                                     </div>
                                 )}
@@ -405,35 +402,29 @@
                                             <div key={i} className="font-mono text-xs border-b border-slate-800/50 pb-4 last:border-none">
                                                 <p className="text-blue-300 font-black mb-2 uppercase tracking-tighter">{i+1}. TAG: {it.equipamento}</p>
                                                 <div className="grid grid-cols-2 gap-y-1.5 pl-3">
-                                                    <span className="text-slate-500 italic uppercase text-[9px] leading-none">Limpos:</span> <span className="text-green-400 font-bold leading-none">{it.tubosLimpos || 0}</span>
-                                                    <span className="text-slate-500 italic uppercase text-[9px] leading-none">Com Ferro:</span> <span className="text-red-400 font-bold leading-none">{it.tubosComFerro || 0}</span>
+                                                    <span className="text-slate-500 italic uppercase text-[9px]">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span>
+                                                    <span className="text-slate-500 italic uppercase text-[9px]">Evidências:</span> <span className="text-slate-300">{(it.fotosAntes || []).length + (it.fotosDepois || []).length} ficheiros</span>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-                                
-                                {errorMessage && (
-                                    <div className="bg-red-50 border border-red-200 p-4 rounded-2xl text-red-600 text-[10px] font-black uppercase text-center animate-pulse">
-                                        {errorMessage}
-                                    </div>
-                                )}
-
                                 <div className="flex flex-col gap-3 pb-8">
                                     <button 
                                         onClick={handleSaveToCloud} 
                                         disabled={isSaving || saveSuccess || !user} 
                                         className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
                                     >
-                                        {isSaving ? 'A Processar...' : <><IconSave /> Confirmar e Gravar na Cloud</>}
+                                        {isSaving ? 'Gravando...' : <><IconSave /> Confirmar e Gravar Dados</>}
                                     </button>
                                     <div className="flex gap-4">
                                         <button onClick={() => setView('form')} disabled={saveSuccess} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400 shadow-sm transition-all hover:bg-slate-50 leading-none">Editar</button>
                                         <button onClick={handleSendWhatsApp} disabled={saveSuccess} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg transition-all hover:bg-green-600 leading-none">
-                                            <IconSend /> Partilhar WhatsApp
+                                            <IconSend /> Partilhar no Grupo
                                         </button>
                                     </div>
-                                    {!user && <p className="text-center text-[9px] text-red-400 font-black uppercase animate-pulse tracking-widest mt-2 leading-none">A aguardar ligação à nuvem...</p>}
+                                    {!user && <p className="text-center text-[9px] text-red-400 font-black uppercase animate-pulse mt-2 leading-none">A aguardar sinal estável...</p>}
+                                    {errorMessage && <p className="text-center text-[9px] text-red-600 font-bold uppercase mt-2">{errorMessage}</p>}
                                 </div>
                             </div>
                         )}
