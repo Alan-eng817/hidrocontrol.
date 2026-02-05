@@ -53,7 +53,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // Ícones
+        // Ícones SVG
         const IconClipboard = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>;
         const IconSearch = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
         const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
@@ -95,7 +95,7 @@
 
             const [formData, setFormData] = useState(initialFormState);
 
-            // Efeito de Autenticação - Corrigido para não travar a UI
+            // Auth Effect
             useEffect(() => {
                 const initAuth = async () => {
                     if (!window.FirebaseSDK) return;
@@ -103,10 +103,7 @@
                     
                     try {
                         const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-                        if (!firebaseConfigStr) {
-                            console.log("Firebase config não encontrada. O app funcionará apenas localmente.");
-                            return;
-                        }
+                        if (!firebaseConfigStr) return;
 
                         const firebaseConfig = JSON.parse(firebaseConfigStr);
                         const app = initializeApp(firebaseConfig);
@@ -122,13 +119,13 @@
 
                         onAuthStateChanged(auth, setUser);
                     } catch (e) {
-                        console.error("Erro na inicialização do Firebase:", e);
+                        console.error("Auth Init Error:", e);
                     }
                 };
                 initAuth();
             }, []);
 
-            // Busca de Histórico
+            // History Sync Effect
             useEffect(() => {
                 if (!user || !window.db) return;
 
@@ -146,7 +143,7 @@
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setHistoryData(data);
                     }, 
-                    (err) => console.error("Erro Firestore:", err)
+                    (err) => console.error("Firestore Sync Error:", err)
                 );
 
                 return () => unsubscribe();
@@ -202,7 +199,6 @@
                 setShowTagList(false);
             };
 
-            // Função para salvar no Banco de Dados
             const handleSaveToCloud = async () => {
                 setIsSaving(true);
                 if (window.db && user) {
@@ -217,22 +213,19 @@
                             tubosComFerro: Number(formData.tubosComFerro) || 0,
                             userId: user.uid,
                             createdAt: serverTimestamp(),
-                            // Não salvamos base64 bruto aqui para não exceder limites do Firestore
                             temFotoAntes: !!formData.fotoAntes,
                             temFotoDepois: !!formData.fotoDepois
                         });
                         setSaveSuccess(true);
                     } catch (e) {
-                        console.error("Erro ao salvar:", e);
+                        console.error("Save Error:", e);
                     }
                 } else {
-                    // Simulação se não houver Firebase (para teste offline)
                     setSaveSuccess(true);
                 }
                 setIsSaving(false);
             };
 
-            // Função para enviar WhatsApp (Opcional)
             const handleSendWhatsApp = () => {
                 const msg = `*HIDROJATO - ${formData.empresa.toUpperCase()}*%0A` +
                     `*Atividades Realizadas*%0A` +
@@ -253,6 +246,7 @@
             const resetForm = () => {
                 setFormData(initialFormState);
                 setSaveSuccess(false);
+                setSearchTerm('');
                 setView('form');
             };
 
@@ -278,7 +272,7 @@
 
                     <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-28">
                         {view === 'dashboard' ? (
-                            /* DASHBOARD VIEW */
+                            /* DASHBOARD */
                             <div className="animate-in fade-in duration-500 space-y-6">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100">
@@ -312,7 +306,7 @@
                                 </section>
                             </div>
                         ) : view === 'form' ? (
-                            /* FORM VIEW */
+                            /* FORMULARIO */
                             <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
                                 <section>
                                     <h3 className="text-[10px] font-black uppercase text-slate-400 mb-2 tracking-widest text-center">Empresa Responsável</h3>
@@ -356,10 +350,36 @@
                                     </div>
                                 </section>
 
+                                <section>
+                                    <h3 className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest text-center">Evidências Visuais</h3>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <input type="file" accept="image/*" capture="environment" className="hidden" ref={inputAntesRef} onChange={(e) => handleFileChange(e, 'fotoAntes')} />
+                                        <button onClick={() => inputAntesRef.current.click()} className={`relative aspect-square rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center transition-all shadow-sm overflow-hidden ${formData.fotoAntes ? 'border-green-600 bg-white shadow-green-100' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
+                                            {formData.previewAntes ? <img src={formData.previewAntes} className="image-preview" /> : <><IconCamera /><span className="text-[10px] font-black uppercase mt-3 tracking-widest leading-none text-center">Antes</span></>}
+                                        </button>
+                                        <input type="file" accept="image/*" capture="environment" className="hidden" ref={inputDepoisRef} onChange={(e) => handleFileChange(e, 'fotoDepois')} />
+                                        <button onClick={() => inputDepoisRef.current.click()} className={`relative aspect-square rounded-[2.5rem] border-2 border-dashed flex flex-col items-center justify-center transition-all shadow-sm overflow-hidden ${formData.fotoDepois ? 'border-green-600 bg-white shadow-green-100' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
+                                            {formData.previewDepois ? <img src={formData.previewDepois} className="image-preview" /> : <><IconCamera /><span className="text-[10px] font-black uppercase mt-3 tracking-widest leading-none text-center">Depois</span></>}
+                                        </button>
+                                    </div>
+                                </section>
+
+                                {/* IMPACTOS E OBSERVAÇÕES - RESTAURADOS */}
+                                <section className="space-y-4">
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none">Impactos Identificados</label>
+                                        <textarea name="impactos" value={formData.impactos} onChange={handleInputChange} placeholder="Descreva atrasos ou dificuldades..." rows="2" className="w-full p-4 bg-white border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"></textarea>
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest leading-none italic">Observações (Opcional)</label>
+                                        <textarea name="observacoes" value={formData.observacoes} onChange={handleInputChange} placeholder="Detalhes adicionais do serviço..." rows="2" className="w-full p-4 bg-white border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"></textarea>
+                                    </div>
+                                </section>
+
                                 <button onClick={() => setView('preview')} disabled={!formData.equipamento || !formData.tubosLimpos} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl shadow-blue-200 active:scale-95 transition-all mt-4 disabled:opacity-30">Revisar Relatório</button>
                             </div>
                         ) : (
-                            /* PREVIEW & ACTIONS VIEW */
+                            /* REVISÃO E AÇÕES */
                             <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6 pt-2 text-sm">
                                 <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800">
                                     <div className="flex justify-between items-start mb-6 border-b border-slate-800 pb-3">
@@ -374,6 +394,23 @@
                                         {(Number(formData.tubosObstruidos) > 0) && <div className="flex justify-between items-center text-red-400"><span>❌ Obstruídos:</span> <span>{formData.tubosObstruidos}</span></div>}
                                         {(Number(formData.tubosComFerro) > 0) && <div className="flex justify-between items-center text-yellow-400 bg-yellow-400/10 p-2 rounded-lg -mx-2"><span>⚠️ Ferro:</span> <span className="font-bold">{formData.tubosComFerro}</span></div>}
                                     </div>
+                                    
+                                    {(formData.impactos || formData.observacoes) && (
+                                        <div className="mt-6 pt-4 border-t border-slate-800 space-y-3">
+                                            {formData.impactos && (
+                                                <div className="space-y-1">
+                                                    <p className="text-[9px] text-blue-400 uppercase font-black tracking-widest">Impactos:</p>
+                                                    <p className="text-xs text-slate-300 italic">{formData.impactos}</p>
+                                                </div>
+                                            )}
+                                            {formData.observacoes && (
+                                                <div className="space-y-1">
+                                                    <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Observações:</p>
+                                                    <p className="text-xs text-slate-300 italic">{formData.observacoes}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {saveSuccess ? (
@@ -400,7 +437,6 @@
                                         </div>
                                     </div>
                                 )}
-                                {!user && !saveSuccess && <p className="text-center text-[9px] text-slate-400 uppercase font-bold tracking-widest">Modo Offline - O envio via WhatsApp continua disponível</p>}
                             </div>
                         )}
                     </main>
