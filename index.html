@@ -20,13 +20,21 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #0f172a; color: white; }
         .hide-scroll::-webkit-scrollbar { display: none; }
         input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        .tag-dropdown { animation: slideDown 0.2s ease-out; border-radius: 1rem; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
+        
+        /* Dark Theme Industrial Styles */
+        .glass-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); border-radius: 2rem; }
+        .tag-dropdown { animation: slideDown 0.2s ease-out; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .success-overlay { animation: fadeIn 0.4s ease-out forwards; background: rgba(30, 58, 138, 0.95); backdrop-filter: blur(8px); }
+        .success-overlay { animation: fadeIn 0.4s ease-out forwards; background: rgba(10, 10, 15, 0.98); backdrop-filter: blur(10px); }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        .main-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%); }
+        .btn-primary { background: #818cf8; box-shadow: 0 10px 15px -3px rgba(129, 140, 248, 0.3); }
+        .btn-whatsapp { background: #22c55e; box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.3); }
+        .premium-input { background: #0a0c10; border: 1px solid #1e293b; color: #f8fafc; }
     </style>
 </head>
 <body class="overflow-x-hidden">
@@ -39,12 +47,12 @@
         // CONFIGURAÇÃO DAS CHAVES (COLE AS SUAS AQUI PARA O VERCEL)
         // =========================================================
         const CONFIG_MANUAL_FIREBASE = {
-            apiKey: "",           // Cole aqui a sua apiKey
-            authDomain: "",       // Cole aqui o seu authDomain
-            projectId: "",        // Cole aqui o seu projectId
-            storageBucket: "",    // Cole aqui o seu storageBucket
-            messagingSenderId: "",// Cole aqui o seu messagingSenderId
-            appId: ""             // Cole aqui o seu appId
+            apiKey: "",           // Cole aqui
+            authDomain: "",       // Cole aqui
+            projectId: "",        // Cole aqui
+            storageBucket: "",    // Cole aqui
+            messagingSenderId: "",// Cole aqui
+            appId: ""             // Cole aqui
         };
         // =========================================================
 
@@ -55,7 +63,6 @@
         const IconChart = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>;
         const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>;
         const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-        const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
 
         const App = () => {
             const [view, setView] = useState('form'); 
@@ -69,15 +76,7 @@
             
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-vercel-prod';
 
-            const initialItemState = {
-                equipamento: '',
-                tubosLimpos: '',
-                tubosObstruidos: '',
-                tubosComFerro: '',
-                impactos: ''
-            };
-
-            const [items, setItems] = useState([{ ...initialItemState }]);
+            const [items, setItems] = useState([{ equipamento: '', tubosLimpos: '', tubosObstruidos: '', tubosComFerro: '', impactos: '' }]);
             const [globalInfo, setGlobalInfo] = useState({
                 data: new Date().toLocaleDateString('pt-BR'),
                 empresa: 'Montisol',
@@ -100,13 +99,11 @@
                         await new Promise(r => setTimeout(r, 100));
                         count++;
                     }
-
                     if (!window.FB_CORE) return;
 
                     const { initializeApp, getFirestore, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = window.FB_CORE;
                     
                     try {
-                        // Tenta pegar a config automática (Gemini) ou a manual (Vercel)
                         let config;
                         const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
                         
@@ -115,7 +112,7 @@
                         } else if (CONFIG_MANUAL_FIREBASE.projectId) {
                             config = CONFIG_MANUAL_FIREBASE;
                         } else {
-                            setSyncStatus('Faltam Chaves');
+                            setSyncStatus('CONFIGURAÇÃO AUSENTE');
                             return;
                         }
 
@@ -124,7 +121,6 @@
                         const firestoreInstance = getFirestore(appInstance);
                         setDb(firestoreInstance);
 
-                        // Auth
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(authInstance, __initial_auth_token);
                         } else {
@@ -134,11 +130,11 @@
                         onAuthStateChanged(authInstance, (u) => {
                             if (u) {
                                 setUser(u);
-                                setSyncStatus('Online');
+                                setSyncStatus('ONLINE');
                             }
                         });
                     } catch (e) {
-                        setSyncStatus('Erro de Config');
+                        setSyncStatus('ERRO DE CONFIG');
                     }
                 };
                 initialize();
@@ -153,162 +149,166 @@
                     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     data.sort((a, b) => (b.localTimestamp || 0) - (a.localTimestamp || 0));
                     setHistoryData(data);
-                }, (err) => setSyncStatus('Erro Permissão'));
+                });
                 
                 return () => unsubscribe();
             }, [user, db]);
 
-            const updateItem = (index, field, value) => {
+            const updateItem = (idx, field, val) => {
                 const newItems = [...items];
-                newItems[index] = { ...newItems[index], [field]: value };
+                newItems[idx] = { ...newItems[idx], [field]: val };
                 setItems(newItems);
             };
 
-            const handleSaveToCloud = async () => {
+            const handleSave = async () => {
                 if (!db || !user) return;
                 setIsSaving(true);
                 try {
                     const { collection, addDoc, serverTimestamp } = window.FB_CORE;
-                    const payload = {
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'relatorios'), {
                         ...globalInfo,
-                        items: items.map(it => ({
-                            equipamento: it.equipamento || 'N/A',
-                            tubosLimpos: Number(it.tubosLimpos) || 0,
-                            tubosObstruidos: Number(it.tubosObstruidos) || 0,
-                            tubosComFerro: Number(it.tubosComFerro) || 0,
-                            impactos: it.impactos || ''
-                        })),
+                        items,
                         userId: user.uid,
                         localTimestamp: Date.now(),
                         createdAt: serverTimestamp()
-                    };
-
-                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'relatorios'), payload);
-                    
+                    });
                     setSaveSuccess(true);
-                    setTimeout(() => {
-                        setSaveSuccess(false);
-                        setItems([{ ...initialItemState }]); 
-                        setView('dashboard');
-                    }, 2000);
-                } catch (e) { 
-                    alert("Erro ao gravar na nuvem.");
-                } finally {
-                    setIsSaving(false);
-                }
+                    setTimeout(() => { setSaveSuccess(false); setView('dashboard'); setItems([{ equipamento: '', tubosLimpos: '', tubosObstruidos: '', tubosComFerro: '', impactos: '' }]); }, 2000);
+                } catch (e) { alert("Erro ao salvar."); }
+                finally { setIsSaving(false); }
+            };
+
+            const handleWhatsApp = () => {
+                let msg = `*RELATÓRIO HIDROJATO - ${globalInfo.empresa.toUpperCase()}*%0A📅 ${globalInfo.data}%0A🕒 ${globalInfo.turno}%0A%0A`;
+                items.forEach((it, i) => msg += `*${i+1}. TAG: ${it.equipamento}*%0A✅ Limpos: ${it.tubosLimpos || 0}%0A%0A`);
+                window.open(`https://wa.me/?text=${msg}`, '_blank');
             };
 
             return (
-                <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-50 border-x border-slate-200 shadow-2xl relative">
-                    <header className="bg-blue-900 text-white p-6 sticky top-0 z-40 shadow-xl flex items-center justify-between rounded-b-[2.5rem]">
-                        <div>
-                            <h1 className="font-black text-2xl tracking-tighter">HIDRO<span className="text-blue-400">CONTROL</span></h1>
-                            <p className="text-[10px] font-bold opacity-50 tracking-widest uppercase">Sistema de Gestão Industrial</p>
+                <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-950 relative">
+                    {/* Header Premium */}
+                    <header className="main-gradient p-7 sticky top-0 z-40 shadow-2xl flex items-center justify-between rounded-b-[2.5rem] border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-white/10 p-2 rounded-xl border border-white/10 shadow-inner">
+                                <IconClipboard />
+                            </div>
+                            <h1 className="font-black text-2xl tracking-tighter uppercase">Hidro<span className="text-blue-400">Control</span></h1>
                         </div>
                         <div className="text-right">
-                            <div className="text-[10px] font-black bg-blue-800 px-3 py-1.5 rounded-full border border-blue-700 uppercase mb-1">{globalInfo.data}</div>
-                            <div className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${syncStatus === 'Online' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{syncStatus}</div>
+                            <div className="text-[10px] font-black bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-full border border-blue-500/30 uppercase mb-1 tracking-widest">{globalInfo.data}</div>
+                            <div className={`text-[8px] font-black tracking-widest ${syncStatus === 'ONLINE' ? 'text-green-400' : 'text-red-400'}`}>{syncStatus}</div>
                         </div>
                     </header>
 
-                    <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-24">
+                    <main className="flex-grow p-5 space-y-6 overflow-y-auto hide-scroll pb-32">
                         {view === 'form' ? (
-                            <div className="space-y-6">
+                            <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
                                 <section className="grid grid-cols-2 gap-3">
                                     {['Montisol', 'Constec'].map(e => (
-                                        <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border-2 ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100'}`}>{e}</button>
+                                        <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${globalInfo.empresa === e ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] scale-105' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>{e}</button>
                                     ))}
                                 </section>
                                 
                                 <section className="grid grid-cols-3 gap-3">
                                     {['ADM', 'T.C', 'T.A'].map(t => (
-                                        <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border-2 ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100'}`}>{t}</button>
+                                        <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${globalInfo.turno === t ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] scale-105' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>{t}</button>
                                     ))}
                                 </section>
 
-                                {items.map((item, idx) => (
-                                    <div key={idx} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-6 relative shadow-sm border-t-8 border-t-blue-600">
-                                        <div className="relative">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Equipamento (TAG)</label>
-                                            <input type="text" placeholder="Pesquisar..." value={item.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 font-black text-blue-900" />
+                                {items.map((it, idx) => (
+                                    <div key={idx} className="glass-card p-6 space-y-6 border-l-8 border-l-blue-500 shadow-2xl relative overflow-hidden">
+                                        <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl"></div>
+                                        <div>
+                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">1. EQUIPAMENTO (TAG)</label>
+                                            <input type="text" placeholder="Pesquisar..." value={it.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full p-4 premium-input rounded-2xl outline-none focus:border-indigo-500 transition-all font-mono text-indigo-400 font-black text-sm" />
                                             {activeDropdownIndex === idx && (
-                                                <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">
-                                                    {equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (
-                                                        <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-black text-xs text-slate-700 cursor-pointer">{tag}</div>
+                                                <div className="absolute z-50 left-0 right-0 mt-3 tag-dropdown max-h-48 overflow-y-auto">
+                                                    {equipamentosLista.filter(tag => tag.includes(it.equipamento)).map(tag => (
+                                                        <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 border-b border-white/5 hover:bg-white/5 font-black text-xs text-white cursor-pointer uppercase tracking-tighter">{tag}</div>
                                                     ))}
                                                 </div>
                                             )}
                                         </div>
 
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase text-center block">Limpos</label><input type="number" value={item.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center font-black text-blue-600" /></div>
-                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase text-center block">Obs.</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center font-black text-slate-400" /></div>
-                                            <div className="space-y-1"><label className="text-[9px] font-black text-red-500 uppercase text-center block">Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-black text-red-600" /></div>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-500 uppercase text-center block tracking-tighter">Limpos</label><input type="number" value={it.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 premium-input rounded-2xl text-center font-black text-green-400 text-lg" /></div>
+                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-500 uppercase text-center block tracking-tighter">Obs.</label><input type="number" value={it.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 premium-input rounded-2xl text-center font-black text-slate-400 text-lg" /></div>
+                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-500 uppercase text-center block tracking-tighter">Ferro</label><input type="number" value={it.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 premium-input rounded-2xl text-center font-black text-indigo-400 text-lg border-indigo-500/30" /></div>
                                         </div>
                                     </div>
                                 ))}
                                 
-                                <button onClick={() => setView('preview')} className="w-full bg-blue-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl active:scale-95 transition-all">Revisar e Enviar</button>
+                                <button onClick={() => setView('preview')} className="w-full btn-primary text-slate-950 py-6 rounded-3xl font-black uppercase tracking-[0.25em] text-[11px] shadow-2xl active:scale-95 transition-all">Revisar Relatório</button>
                             </div>
                         ) : view === 'dashboard' ? (
-                            <div className="space-y-6">
-                                <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 text-center">
-                                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">Produção Total (Tubos)</p>
-                                    <h2 className="text-5xl font-black text-blue-900">{historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + Number(i.tubosLimpos), 0), 0)}</h2>
+                            <div className="space-y-6 animate-in fade-in duration-700">
+                                <div className="glass-card p-8 text-center border-t-8 border-t-indigo-500">
+                                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">RESUMO CONSOLIDADO</p>
+                                    <div className="flex justify-center items-baseline gap-2">
+                                        <h2 className="text-6xl font-black text-white tracking-tighter">{historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + Number(i.tubosLimpos), 0), 0)}</h2>
+                                        <span className="text-indigo-400 font-bold text-xs uppercase">Limpos</span>
+                                    </div>
                                 </div>
-                                <div className="space-y-3">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Histórico Recente</p>
-                                    {historyData.slice(0, 10).map(rel => (
-                                        <div key={rel.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm">
+                                <div className="space-y-4">
+                                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-4">Histórico Industrial</h3>
+                                    {historyData.slice(0, 8).map(rel => (
+                                        <div key={rel.id} className="glass-card p-5 flex items-center justify-between border-l-4 border-l-indigo-500">
                                             <div>
-                                                <p className="text-xs font-black text-slate-800">{rel.data} - {rel.turno}</p>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{(rel.items || []).length} Equipamentos • {rel.empresa}</p>
+                                                <p className="text-xs font-black text-white">{rel.data} • {rel.turno}</p>
+                                                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">{rel.empresa} • {(rel.items || []).length} TAGs</p>
                                             </div>
-                                            <div className="text-blue-600 font-black text-xs">+{ (rel.items || []).reduce((a,i) => a + Number(i.tubosLimpos), 0) }</div>
+                                            <div className="text-green-400 font-black text-sm">+{ (rel.items || []).reduce((a,i) => a + Number(i.tubosLimpos), 0) }</div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         ) : (
-                            <div className="space-y-6">
-                                <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border-4 border-slate-800 text-white relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-4 opacity-10"><IconClipboard /></div>
-                                    <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest mb-6 border-b border-white/10 pb-4">Consolidado do Turno</h2>
+                            <div className="space-y-8 animate-in zoom-in-95 duration-500 pt-4">
+                                <div className="bg-[#0a0a0c] p-8 rounded-[3.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] border border-white/5 text-white relative">
+                                    <div className="bg-indigo-600/10 w-fit px-4 py-1 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6 border border-indigo-500/20">{globalInfo.empresa} • {globalInfo.turno}</div>
+                                    <h2 className="text-slate-500 font-black uppercase text-[10px] tracking-[0.4em] mb-8">Resumo de Envio</h2>
                                     {items.map((it, i) => (
-                                        <div key={i} className="mb-6 last:mb-0">
-                                            <p className="text-white font-black text-sm uppercase mb-1">{it.equipamento}</p>
-                                            <div className="flex gap-4 font-mono text-[10px] font-bold">
-                                                <span className="text-green-400">LIMPOS: {it.tubosLimpos || 0}</span>
-                                                <span className="text-slate-500">OBS: {it.tubosObstruidos || 0}</span>
-                                                <span className="text-red-400">FERRO: {it.tubosComFerro || 0}</span>
+                                        <div key={i} className="mb-8 last:mb-0 border-l-2 border-indigo-500/30 pl-5">
+                                            <p className="text-white font-black text-base uppercase mb-2 tracking-tighter">{i+1}. TAG: {it.equipamento}</p>
+                                            <div className="flex gap-5 font-mono text-[10px] font-bold">
+                                                <span className="text-green-400">✅ {it.tubosLimpos || 0} LIMPOS</span>
+                                                <span className="text-slate-600">❌ {it.tubosObstruidos || 0} OBS</span>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-                                <button onClick={handleSaveToCloud} disabled={isSaving || syncStatus !== 'Online'} className="w-full bg-blue-600 text-white py-6 rounded-[2.5rem] font-black uppercase text-[10px] shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30 transition-all">
-                                    {isSaving ? 'Gravando...' : <><IconSave /> Finalizar e Salvar na Cloud</>}
-                                </button>
-                                <button onClick={() => setView('form')} className="w-full text-slate-400 font-black uppercase text-[9px] tracking-widest">Voltar para Editar</button>
+                                <div className="space-y-3">
+                                    <button onClick={handleSave} disabled={isSaving || syncStatus !== 'ONLINE'} className="w-full btn-primary text-slate-950 py-6 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 active:scale-95 disabled:opacity-20 transition-all tracking-widest">
+                                        {isSaving ? 'Gravando na Cloud...' : <><IconSave /> Finalizar e Gravar na Cloud</>}
+                                    </button>
+                                    <div className="flex gap-4">
+                                        <button onClick={() => setView('form')} className="flex-1 bg-white/5 py-5 rounded-[2.5rem] font-black uppercase text-[9px] border border-white/10 text-slate-400 active:bg-white/10 transition-colors">Editar</button>
+                                        <button onClick={handleWhatsApp} className="flex-[2] btn-whatsapp text-white py-5 rounded-[2.5rem] font-black uppercase text-[9px] flex items-center justify-center gap-2 active:scale-95 tracking-widest">
+                                            <IconSend /> WhatsApp
+                                        </button>
+                                    </div>
+                                </div>
+                                {syncStatus !== 'ONLINE' && <p className="text-red-500 text-[9px] font-black text-center uppercase tracking-widest animate-pulse">A aguardar ligação à nuvem...</p>}
                             </div>
                         )}
                     </main>
 
                     {saveSuccess && (
                         <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6">
-                            <div className="bg-white p-12 rounded-[4rem] text-center shadow-2xl animate-in zoom-in duration-300">
-                                <div className="bg-green-500 text-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl"><IconCheck /></div>
-                                <h3 className="text-blue-900 font-black uppercase text-xl tracking-tighter">Registo Salvo!</h3>
-                                <p className="text-slate-400 text-xs font-bold mt-2 uppercase tracking-widest">A sincronizar dados...</p>
+                            <div className="glass-card p-12 text-center shadow-[0_0_100px_rgba(79,70,229,0.2)] animate-in zoom-in duration-500">
+                                <div className="bg-indigo-600 text-white w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_rgba(79,70,229,0.5)]"><IconCheck /></div>
+                                <h3 className="text-white font-black uppercase text-2xl tracking-tighter">Registo Industrial Concluído!</h3>
+                                <p className="text-indigo-400 text-xs font-bold mt-3 uppercase tracking-widest">Sincronizando com Vercel Cloud...</p>
                             </div>
                         </div>
                     )}
 
-                    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white/90 backdrop-blur-xl border-t border-slate-100 px-10 py-5 flex justify-around items-center z-40 rounded-t-[3rem] shadow-2xl">
-                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view !== 'dashboard' ? 'text-blue-900 scale-110' : 'text-slate-300'}`}>
-                            <IconClipboard /><span className="text-[8px] font-black uppercase mt-1">Lançar</span>
+                    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-[#0a0c10]/80 backdrop-blur-2xl border-t border-white/5 px-12 py-6 flex justify-around items-center z-40 rounded-t-[3.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
+                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all duration-300 ${view !== 'dashboard' ? 'text-indigo-400 scale-125' : 'text-slate-600'}`}>
+                            <IconClipboard /><span className="text-[8px] font-black uppercase mt-1.5 tracking-tighter">Relatório</span>
                         </button>
-                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-900 scale-110' : 'text-slate-300'}`}>
-                            <IconChart /><span className="text-[8px] font-black uppercase mt-1">Dashboard</span>
+                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all duration-300 ${view === 'dashboard' ? 'text-indigo-400 scale-125' : 'text-slate-600'}`}>
+                            <IconChart /><span className="text-[8px] font-black uppercase mt-1.5 tracking-tighter">Dashboard</span>
                         </button>
                     </nav>
                 </div>
