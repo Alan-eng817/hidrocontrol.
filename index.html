@@ -20,22 +20,19 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #0f172a; color: white; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; transition: background-color 0.3s ease; }
         .hide-scroll::-webkit-scrollbar { display: none; }
         input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         
-        /* Dark Theme Industrial Styles */
-        .glass-card { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); border-radius: 2rem; }
-        .tag-dropdown { animation: slideDown 0.2s ease-out; background: #1e293b; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .success-overlay { animation: fadeIn 0.4s ease-out forwards; background: rgba(10, 10, 15, 0.98); backdrop-filter: blur(10px); }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         
-        .main-gradient { background: linear-gradient(135deg, #1e3a8a 0%, #0f172a 100%); }
-        .btn-primary { background: #818cf8; box-shadow: 0 10px 15px -3px rgba(129, 140, 248, 0.3); }
-        .btn-whatsapp { background: #22c55e; box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.3); }
-        .premium-input { background: #0a0c10; border: 1px solid #1e293b; color: #f8fafc; }
-        .premium-textarea { background: #0a0c10; border: 1px solid #1e293b; color: #f8fafc; min-height: 80px; resize: none; }
+        .tag-dropdown { animation: slideDown 0.2s ease-out; z-index: 100; }
+        .success-overlay { animation: fadeIn 0.4s ease-out forwards; backdrop-filter: blur(10px); }
+        
+        /* Glass effect utilities */
+        .glass-dark { background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(12px); }
+        .glass-light { background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(0, 0, 0, 0.05); backdrop-filter: blur(12px); }
     </style>
 </head>
 <body class="overflow-x-hidden">
@@ -64,9 +61,13 @@
         const IconChart = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>;
         const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>;
         const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+        const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
+        const IconSun = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>;
+        const IconMoon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>;
 
         const App = () => {
             const [view, setView] = useState('form'); 
+            const [theme, setTheme] = useState('dark');
             const [user, setUser] = useState(null);
             const [db, setDb] = useState(null);
             const [historyData, setHistoryData] = useState([]);
@@ -77,7 +78,17 @@
             
             const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-vercel-prod';
 
-            const [items, setItems] = useState([{ equipamento: '', tubosLimpos: '', tubosObstruidos: '', tubosComFerro: '', impactos: '', observacoes: '' }]);
+            const [items, setItems] = useState([{ 
+                equipamento: '', 
+                tubosLimpos: '', 
+                tubosObstruidos: '', 
+                tubosComFerro: '', 
+                impactos: '', 
+                observacoes: '',
+                fotoAntes: null,
+                fotoDepois: null
+            }]);
+
             const [globalInfo, setGlobalInfo] = useState({
                 data: new Date().toLocaleDateString('pt-BR'),
                 empresa: 'Montisol',
@@ -161,6 +172,11 @@
                 setItems(newItems);
             };
 
+            const handlePhoto = (idx, field) => {
+                // Simulação de captura de foto
+                updateItem(idx, field, "Foto Capturada");
+            };
+
             const handleSave = async () => {
                 if (!db || !user) return;
                 setIsSaving(true);
@@ -177,7 +193,7 @@
                     setTimeout(() => { 
                         setSaveSuccess(false); 
                         setView('dashboard'); 
-                        setItems([{ equipamento: '', tubosLimpos: '', tubosObstruidos: '', tubosComFerro: '', impactos: '', observacoes: '' }]); 
+                        setItems([{ equipamento: '', tubosLimpos: '', tubosObstruidos: '', tubosComFerro: '', impactos: '', observacoes: '', fotoAntes: null, fotoDepois: null }]); 
                     }, 2000);
                 } catch (e) { alert("Erro ao salvar."); }
                 finally { setIsSaving(false); }
@@ -194,19 +210,36 @@
                 window.open(`https://wa.me/?text=${msg}`, '_blank');
             };
 
+            // Estilos dinâmicos baseados no tema
+            const bgClass = theme === 'dark' ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900';
+            const cardClass = theme === 'dark' ? 'glass-dark' : 'glass-light';
+            const inputClass = theme === 'dark' ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-white border-slate-200 text-indigo-600';
+            const labelClass = theme === 'dark' ? 'text-slate-500' : 'text-slate-400';
+            const navClass = theme === 'dark' ? 'bg-slate-900/80 border-white/5' : 'bg-white/90 border-slate-200';
+
             return (
-                <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-950 relative">
+                <div className={`min-h-screen flex flex-col max-w-lg mx-auto relative transition-colors duration-300 ${bgClass}`}>
+                    
                     {/* Header Premium */}
-                    <header className="main-gradient p-7 sticky top-0 z-40 shadow-2xl flex items-center justify-between rounded-b-[2.5rem] border-b border-white/5">
+                    <header className={`p-7 sticky top-0 z-40 shadow-2xl flex items-center justify-between rounded-b-[2.5rem] border-b ${theme === 'dark' ? 'bg-gradient-to-br from-blue-900 to-slate-950 border-white/5' : 'bg-gradient-to-br from-blue-600 to-blue-800 border-blue-400/20 text-white'}`}>
                         <div className="flex items-center gap-3">
                             <div className="bg-white/10 p-2 rounded-xl border border-white/10 shadow-inner">
                                 <IconClipboard />
                             </div>
-                            <h1 className="font-black text-2xl tracking-tighter uppercase">Hidro<span className="text-blue-400">Control</span></h1>
+                            <h1 className="font-black text-2xl tracking-tighter uppercase">Hidro<span className={theme === 'dark' ? "text-blue-400" : "text-blue-100"}>Control</span></h1>
                         </div>
-                        <div className="text-right">
-                            <div className="text-[10px] font-black bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-full border border-blue-500/30 uppercase mb-1 tracking-widest">{globalInfo.data}</div>
-                            <div className={`text-[8px] font-black tracking-widest ${syncStatus === 'ONLINE' ? 'text-green-400' : 'text-red-400'}`}>{syncStatus}</div>
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                                className="p-2.5 rounded-xl bg-white/10 border border-white/10 hover:bg-white/20 transition-all active:scale-90"
+                                title="Alternar Tema"
+                            >
+                                {theme === 'dark' ? <IconSun /> : <IconMoon />}
+                            </button>
+                            <div className="text-right hidden sm:block">
+                                <div className="text-[10px] font-black bg-blue-500/20 text-blue-100 px-3 py-1.5 rounded-full border border-blue-500/30 uppercase mb-1 tracking-widest">{globalInfo.data}</div>
+                                <div className={`text-[8px] font-black tracking-widest ${syncStatus === 'ONLINE' ? 'text-green-400' : 'text-red-400'}`}>{syncStatus}</div>
+                            </div>
                         </div>
                     </header>
 
@@ -215,126 +248,146 @@
                             <div className="space-y-6 animate-in slide-in-from-bottom duration-500">
                                 <section className="grid grid-cols-2 gap-3">
                                     {['Montisol', 'Constec'].map(e => (
-                                        <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${globalInfo.empresa === e ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] scale-105' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>{e}</button>
+                                        <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${globalInfo.empresa === e ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg scale-105' : theme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400'}`}>{e}</button>
                                     ))}
                                 </section>
                                 
                                 <section className="grid grid-cols-3 gap-3">
                                     {['ADM', 'T.C', 'T.A'].map(t => (
-                                        <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${globalInfo.turno === t ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] scale-105' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>{t}</button>
+                                        <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest border-2 transition-all ${globalInfo.turno === t ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg scale-105' : theme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-200 text-slate-400'}`}>{t}</button>
                                     ))}
                                 </section>
 
                                 {items.map((it, idx) => (
-                                    <div key={idx} className="glass-card p-6 space-y-6 border-l-8 border-l-blue-500 shadow-2xl relative overflow-hidden">
-                                        <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl"></div>
+                                    <div key={idx} className={`${cardClass} p-6 space-y-6 border-l-8 border-l-blue-500 shadow-2xl relative overflow-hidden transition-all duration-300`}>
                                         <div>
-                                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">1. EQUIPAMENTO (TAG)</label>
-                                            <input type="text" placeholder="Pesquisar..." value={it.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full p-4 premium-input rounded-2xl outline-none focus:border-indigo-500 transition-all font-mono text-indigo-400 font-black text-sm" />
+                                            <label className={`text-[10px] font-black uppercase tracking-widest mb-2 block ${labelClass}`}>1. EQUIPAMENTO (TAG)</label>
+                                            <input type="text" placeholder="Pesquisar..." value={it.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className={`w-full p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-mono font-black text-sm border ${inputClass}`} />
                                             {activeDropdownIndex === idx && (
-                                                <div className="absolute z-50 left-0 right-0 mt-3 tag-dropdown max-h-48 overflow-y-auto">
+                                                <div className={`absolute z-50 left-0 right-0 mt-3 tag-dropdown max-h-48 overflow-y-auto rounded-2xl shadow-2xl border ${theme === 'dark' ? 'bg-slate-800 border-white/10' : 'bg-white border-slate-200'}`}>
                                                     {equipamentosLista.filter(tag => tag.includes(it.equipamento)).map(tag => (
-                                                        <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 border-b border-white/5 hover:bg-white/5 font-black text-xs text-white cursor-pointer uppercase tracking-tighter">{tag}</div>
+                                                        <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className={`px-5 py-4 border-b border-white/5 hover:bg-blue-500/10 font-black text-xs cursor-pointer uppercase tracking-tighter ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>{tag}</div>
                                                     ))}
                                                 </div>
                                             )}
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-4">
-                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-500 uppercase text-center block tracking-tighter">Limpos</label><input type="number" value={it.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 premium-input rounded-2xl text-center font-black text-green-400 text-lg" /></div>
-                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-500 uppercase text-center block tracking-tighter">Obs.</label><input type="number" value={it.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 premium-input rounded-2xl text-center font-black text-slate-400 text-lg" /></div>
-                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-500 uppercase text-center block tracking-tighter">Ferro</label><input type="number" value={it.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 premium-input rounded-2xl text-center font-black text-indigo-400 text-lg border-indigo-500/30" /></div>
+                                            <div className="space-y-1"><label className={`text-[9px] font-black uppercase text-center block tracking-tighter ${labelClass}`}>Limpos</label><input type="number" value={it.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className={`w-full p-4 rounded-2xl text-center font-black text-lg border ${inputClass.replace('indigo', 'green')}`} /></div>
+                                            <div className="space-y-1"><label className={`text-[9px] font-black uppercase text-center block tracking-tighter ${labelClass}`}>Obs.</label><input type="number" value={it.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className={`w-full p-4 rounded-2xl text-center font-black text-lg border ${inputClass.replace('indigo', 'slate')}`} /></div>
+                                            <div className="space-y-1"><label className={`text-[9px] font-black uppercase text-center block tracking-tighter ${labelClass}`}>Ferro</label><input type="number" value={it.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className={`w-full p-4 rounded-2xl text-center font-black text-lg border ${inputClass}`} /></div>
+                                        </div>
+
+                                        {/* EVIDÊNCIAS FOTOGRÁFICAS */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <button 
+                                                onClick={() => handlePhoto(idx, 'fotoAntes')}
+                                                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed transition-all ${it.fotoAntes ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-slate-500/5 border-slate-700 text-slate-500 hover:border-indigo-500 hover:text-indigo-400'}`}
+                                            >
+                                                <IconCamera />
+                                                <span className="text-[9px] font-black uppercase mt-2 tracking-widest">{it.fotoAntes ? 'FOTO ANTES OK' : 'FOTO ANTES'}</span>
+                                            </button>
+                                            <button 
+                                                onClick={() => handlePhoto(idx, 'fotoDepois')}
+                                                className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed transition-all ${it.fotoDepois ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-slate-500/5 border-slate-700 text-slate-500 hover:border-indigo-500 hover:text-indigo-400'}`}
+                                            >
+                                                <IconCamera />
+                                                <span className="text-[9px] font-black uppercase mt-2 tracking-widest">{it.fotoDepois ? 'FOTO DEPOIS OK' : 'FOTO DEPOIS'}</span>
+                                            </button>
                                         </div>
 
                                         <div className="space-y-4">
                                             <div>
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Evidências de Impactos</label>
-                                                <textarea value={it.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva os impactos encontrados..." className="w-full p-4 premium-textarea rounded-2xl outline-none focus:border-indigo-500 transition-all font-medium text-slate-300 text-xs" />
+                                                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 block ${labelClass}`}>Evidências de Impactos</label>
+                                                <textarea value={it.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Relate os impactos industriais..." className={`w-full p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-xs min-h-[80px] resize-none border ${inputClass}`} />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Observações Gerais</label>
-                                                <textarea value={it.observacoes} onChange={(e) => updateItem(idx, 'observacoes', e.target.value)} placeholder="Notas adicionais do serviço..." className="w-full p-4 premium-textarea rounded-2xl outline-none focus:border-indigo-500 transition-all font-medium text-slate-300 text-xs" />
+                                                <label className={`text-[10px] font-black uppercase tracking-widest mb-2 block ${labelClass}`}>Observações Gerais</label>
+                                                <textarea value={it.observacoes} onChange={(e) => updateItem(idx, 'observacoes', e.target.value)} placeholder="Notas do turno e anomalias..." className={`w-full p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 transition-all font-medium text-xs min-h-[80px] resize-none border ${inputClass}`} />
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                                 
-                                <button onClick={() => setItems([...items, { equipamento: '', tubosLimpos: '', tubosObstruidos: '', tubosComFerro: '', impactos: '', observacoes: '' }])} className="w-full py-5 rounded-[2rem] bg-slate-900 border-2 border-dashed border-slate-800 text-indigo-400 font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all"><IconPlus /> Adicionar Novo Equipamento</button>
+                                <button onClick={() => setItems([...items, { equipamento: '', tubosLimpos: '', tubosObstruidos: '', tubosComFerro: '', impactos: '', observacoes: '', fotoAntes: null, fotoDepois: null }])} className={`w-full py-5 rounded-[2rem] border-2 border-dashed font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all ${theme === 'dark' ? 'bg-slate-900 border-slate-800 text-indigo-400' : 'bg-slate-100 border-slate-200 text-indigo-600'}`}><IconPlus /> Adicionar Novo Equipamento</button>
 
-                                <button onClick={() => setView('preview')} className="w-full btn-primary text-slate-950 py-6 rounded-3xl font-black uppercase tracking-[0.25em] text-[11px] shadow-2xl active:scale-95 transition-all">Revisar Relatório</button>
+                                <button onClick={() => setView('preview')} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-6 rounded-3xl font-black uppercase tracking-[0.25em] text-[11px] shadow-2xl active:scale-95 transition-all">Revisar Relatório</button>
                             </div>
                         ) : view === 'dashboard' ? (
                             <div className="space-y-6 animate-in fade-in duration-700">
-                                <div className="glass-card p-8 text-center border-t-8 border-t-indigo-500">
-                                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">PRODUÇÃO ACUMULADA</p>
+                                <div className={`${cardClass} p-8 text-center border-t-8 border-t-indigo-500 shadow-xl`}>
+                                    <p className={`text-[11px] font-black uppercase tracking-widest mb-3 ${labelClass}`}>PRODUÇÃO TOTAL (TUBOS)</p>
                                     <div className="flex justify-center items-baseline gap-2">
-                                        <h2 className="text-6xl font-black text-white tracking-tighter">{historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + Number(i.tubosLimpos), 0), 0)}</h2>
-                                        <span className="text-indigo-400 font-bold text-xs uppercase">Limpos</span>
+                                        <h2 className={`text-6xl font-black tracking-tighter ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + Number(i.tubosLimpos), 0), 0)}</h2>
+                                        <span className="text-indigo-500 font-bold text-xs uppercase">Limpos</span>
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-4">Histórico Industrial</h3>
+                                    <h3 className={`text-[10px] font-black uppercase tracking-[0.3em] px-4 ${labelClass}`}>Histórico Sincronizado</h3>
                                     {historyData.slice(0, 8).map(rel => (
-                                        <div key={rel.id} className="glass-card p-5 flex items-center justify-between border-l-4 border-l-indigo-500">
+                                        <div key={rel.id} className={`${cardClass} p-5 flex items-center justify-between border-l-4 border-l-indigo-500 transition-transform active:scale-95 cursor-pointer`}>
                                             <div>
-                                                <p className="text-xs font-black text-white">{rel.data} • {rel.turno}</p>
+                                                <p className={`text-xs font-black ${theme === 'dark' ? 'text-white' : 'text-slate-800'}`}>{rel.data} • {rel.turno}</p>
                                                 <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">{rel.empresa} • {(rel.items || []).length} TAGs</p>
                                             </div>
-                                            <div className="text-green-400 font-black text-sm">+{ (rel.items || []).reduce((a,i) => a + Number(i.tubosLimpos), 0) }</div>
+                                            <div className="text-green-500 font-black text-sm">+{ (rel.items || []).reduce((a,i) => a + Number(i.tubosLimpos), 0) }</div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         ) : (
                             <div className="space-y-8 animate-in zoom-in-95 duration-500 pt-4">
-                                <div className="bg-[#0a0a0c] p-8 rounded-[3.5rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] border border-white/5 text-white relative">
-                                    <div className="bg-indigo-600/10 w-fit px-4 py-1 rounded-full text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-6 border border-indigo-500/20">{globalInfo.empresa} • {globalInfo.turno}</div>
-                                    <h2 className="text-slate-500 font-black uppercase text-[10px] tracking-[0.4em] mb-8">Resumo do Turno</h2>
+                                <div className={`${theme === 'dark' ? 'bg-[#0a0a0c]' : 'bg-slate-800'} p-8 rounded-[3.5rem] shadow-2xl border border-white/5 text-white relative`}>
+                                    <h2 className="text-slate-500 font-black uppercase text-[10px] tracking-[0.4em] mb-8">Resumo Final do Turno</h2>
                                     {items.map((it, i) => (
                                         <div key={i} className="mb-8 last:mb-0 border-l-2 border-indigo-500/30 pl-5 space-y-2">
                                             <p className="text-white font-black text-base uppercase tracking-tighter">{i+1}. TAG: {it.equipamento}</p>
-                                            <div className="flex gap-5 font-mono text-[10px] font-bold">
-                                                <span className="text-green-400">✅ {it.tubosLimpos || 0} LIMPOS</span>
-                                                <span className="text-slate-600">❌ {it.tubosObstruidos || 0} OBS</span>
-                                                <span className="text-indigo-400">⚠️ {it.tubosComFerro || 0} FERRO</span>
+                                            <div className="flex flex-wrap gap-4 font-mono text-[10px] font-bold">
+                                                <span className="text-green-400">✅ {it.tubosLimpos || 0} L</span>
+                                                <span className="text-slate-400">❌ {it.tubosObstruidos || 0} O</span>
+                                                <span className="text-indigo-400">⚠️ {it.tubosComFerro || 0} F</span>
+                                                <span className="text-blue-400">📸 {it.fotoAntes && it.fotoDepois ? 'FOTOS OK' : 'SEM FOTOS'}</span>
                                             </div>
-                                            {it.impactos && <p className="text-[9px] text-slate-400 italic">Impactos: {it.impactos}</p>}
-                                            {it.observacoes && <p className="text-[9px] text-slate-400 italic">Obs: {it.observacoes}</p>}
+                                            {(it.impactos || it.observacoes) && (
+                                                <div className="bg-white/5 p-3 rounded-xl mt-2">
+                                                    {it.impactos && <p className="text-[9px] text-slate-400 mb-1 leading-relaxed"><span className="text-indigo-300 font-black">IMPACTOS:</span> {it.impactos}</p>}
+                                                    {it.observacoes && <p className="text-[9px] text-slate-400 leading-relaxed"><span className="text-indigo-300 font-black">NOTAS:</span> {it.observacoes}</p>}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
-                                <div className="space-y-3">
-                                    <button onClick={handleSave} disabled={isSaving || syncStatus !== 'ONLINE'} className="w-full btn-primary text-slate-950 py-6 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 active:scale-95 disabled:opacity-20 transition-all tracking-widest">
-                                        {isSaving ? 'Gravando na Cloud...' : <><IconSave /> Finalizar e Gravar na Cloud</>}
+                                <div className="space-y-3 pb-10">
+                                    <button onClick={handleSave} disabled={isSaving || syncStatus !== 'ONLINE'} className="w-full bg-indigo-600 text-white py-6 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-3 active:scale-95 disabled:opacity-20 transition-all tracking-widest shadow-[0_0_30px_rgba(79,70,229,0.4)]">
+                                        {isSaving ? 'A Sincronizar...' : <><IconSave /> Gravar na Cloud Industrial</>}
                                     </button>
                                     <div className="flex gap-4">
-                                        <button onClick={() => setView('form')} className="flex-1 bg-white/5 py-5 rounded-[2.5rem] font-black uppercase text-[9px] border border-white/10 text-slate-400 active:bg-white/10 transition-colors">Editar</button>
-                                        <button onClick={handleWhatsApp} className="flex-[2] btn-whatsapp text-white py-5 rounded-[2.5rem] font-black uppercase text-[9px] flex items-center justify-center gap-2 active:scale-95 tracking-widest">
+                                        <button onClick={() => setView('form')} className={`flex-1 py-5 rounded-[2.5rem] font-black uppercase text-[9px] border transition-colors ${theme === 'dark' ? 'bg-white/5 border-white/10 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>Voltar</button>
+                                        <button onClick={handleWhatsApp} className="flex-[2] bg-green-500 hover:bg-green-400 text-white py-5 rounded-[2.5rem] font-black uppercase text-[9px] flex items-center justify-center gap-2 active:scale-95 tracking-widest shadow-lg">
                                             <IconSend /> WhatsApp
                                         </button>
                                     </div>
                                 </div>
-                                {syncStatus !== 'ONLINE' && <p className="text-red-500 text-[9px] font-black text-center uppercase tracking-widest animate-pulse">A aguardar ligação à nuvem...</p>}
                             </div>
                         )}
                     </main>
 
                     {saveSuccess && (
-                        <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6">
-                            <div className="glass-card p-12 text-center shadow-[0_0_100px_rgba(79,70,229,0.2)] animate-in zoom-in duration-500">
-                                <div className="bg-indigo-600 text-white w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_rgba(79,70,229,0.5)]"><IconCheck /></div>
-                                <h3 className="text-white font-black uppercase text-2xl tracking-tighter">Registo Industrial Concluído!</h3>
-                                <p className="text-indigo-400 text-xs font-bold mt-3 uppercase tracking-widest">Sincronizando com Vercel Cloud...</p>
+                        <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/95">
+                            <div className={`${cardClass} p-12 text-center shadow-[0_0_100px_rgba(79,70,229,0.2)] animate-in zoom-in duration-500 max-w-[80%]`}>
+                                <div className="bg-indigo-600 text-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl animate-bounce"><IconCheck /></div>
+                                <h3 className={`font-black uppercase text-2xl tracking-tighter ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Dados Gravados com Sucesso!</h3>
+                                <p className="text-indigo-500 text-xs font-bold mt-3 uppercase tracking-widest">Sincronização Cloud Concluída</p>
                             </div>
                         </div>
                     )}
 
-                    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-[#0a0c10]/80 backdrop-blur-2xl border-t border-white/5 px-12 py-6 flex justify-around items-center z-40 rounded-t-[3.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
-                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all duration-300 ${view !== 'dashboard' ? 'text-indigo-400 scale-125' : 'text-slate-600'}`}>
+                    <nav className={`fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg backdrop-blur-2xl border-t px-12 py-6 flex justify-around items-center z-40 rounded-t-[3.5rem] shadow-[0_-20px_50px_rgba(0,0,0,0.2)] transition-colors duration-300 ${navClass}`}>
+                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all duration-300 ${view !== 'dashboard' ? 'text-indigo-500 scale-125' : 'text-slate-400'}`}>
                             <IconClipboard /><span className="text-[8px] font-black uppercase mt-1.5 tracking-tighter">Relatório</span>
                         </button>
-                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all duration-300 ${view === 'dashboard' ? 'text-indigo-400 scale-125' : 'text-slate-600'}`}>
-                            <IconChart /><span className="text-[8px] font-black uppercase mt-1.5 tracking-tighter">Dashboard</span>
+                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all duration-300 ${view === 'dashboard' ? 'text-indigo-500 scale-125' : 'text-slate-400'}`}>
+                            <IconChart /><span className="text-[8px] font-black uppercase mt-1.5 tracking-tighter">Histórico</span>
                         </button>
                     </nav>
                 </div>
