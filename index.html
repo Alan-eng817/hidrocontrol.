@@ -8,15 +8,14 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, serverTimestamp, query, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, serverTimestamp, query, onSnapshot, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        window.FB_CORE = { initializeApp, getFirestore, collection, addDoc, serverTimestamp, query, onSnapshot, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken };
+        window.FB_CORE = { initializeApp, getFirestore, collection, addDoc, serverTimestamp, query, onSnapshot, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, doc, getDoc };
     </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -26,30 +25,37 @@
         input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .tag-dropdown { animation: slideDown 0.2s ease-out; border-radius: 1rem; box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1); }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        .image-preview { object-fit: cover; width: 100%; height: 100%; border-radius: 0.75rem; }
         .success-overlay { animation: fadeIn 0.4s ease-out forwards; background: rgba(30, 58, 138, 0.95); backdrop-filter: blur(8px); }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .card-shadow { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05); }
     </style>
 </head>
 <body class="overflow-x-hidden">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+        const { useState, useEffect, useRef } = React;
+
+        // =========================================================
+        // CONFIGURAÇÃO DAS CHAVES (COLE AS SUAS AQUI PARA O VERCEL)
+        // =========================================================
+        const CONFIG_MANUAL_FIREBASE = {
+            apiKey: "",           // Cole aqui a sua apiKey
+            authDomain: "",       // Cole aqui o seu authDomain
+            projectId: "",        // Cole aqui o seu projectId
+            storageBucket: "",    // Cole aqui o seu storageBucket
+            messagingSenderId: "",// Cole aqui o seu messagingSenderId
+            appId: ""             // Cole aqui o seu appId
+        };
+        // =========================================================
 
         // --- Ícones ---
         const IconClipboard = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>;
-        const IconSearch = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
-        const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
         const IconSend = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
         const IconSave = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>;
         const IconChart = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>;
-        const IconX = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
+        const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>;
         const IconPlus = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
         const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>;
-        const IconCheck = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>;
-        const IconDownload = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
 
         const App = () => {
             const [view, setView] = useState('form'); 
@@ -61,20 +67,14 @@
             const [activeDropdownIndex, setActiveDropdownIndex] = useState(null);
             const [syncStatus, setSyncStatus] = useState('A conectar...');
             
-            const chartPieRef = useRef(null);
-            const chartBarRef = useRef(null);
-            
-            // Constante estrita de identificação - Alterada para garantir nova pasta limpa
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-alumar-v1-prod';
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-vercel-prod';
 
             const initialItemState = {
                 equipamento: '',
                 tubosLimpos: '',
                 tubosObstruidos: '',
                 tubosComFerro: '',
-                impactos: '',
-                fotosAntes: [],
-                fotosDepois: []
+                impactos: ''
             };
 
             const [items, setItems] = useState([{ ...initialItemState }]);
@@ -84,37 +84,47 @@
                 turno: 'ADM'
             });
 
-            // --- Regra 3: Autenticação Prioritária e Await ---
+            const equipamentosLista = [
+                '025A-TC-21A','025A-TC-21B','025A-TC-21C','025A-TC-21D','025A-TC-21E','025A-TC-21F',
+                '030-TC-001','030-TC-002','030-TC-003','030-TC-004','030-TC-005','030-TC-010',
+                '030-TC-11A','030-TC-11B','030-TC-22A','030-TC-22B','030-TC-24A','030-TC-24B',
+                '040-TC-011','042-TC-011','042-TC-016','042-TC-017','042-TC-018','042-TC-019',
+                '042-TC-021','042-TC-026','042-TC-027','042-TC-028','042-TC-029',
+                '042-TC-031','042-TC-036','042-TC-037','042-TC-038','042-TC-039','030-VA-16'
+            ].sort();
+
             useEffect(() => {
                 const initialize = async () => {
-                    // Espera pelo SDK no mobile
                     let count = 0;
                     while (!window.FB_CORE && count < 50) {
                         await new Promise(r => setTimeout(r, 100));
                         count++;
                     }
 
-                    if (!window.FB_CORE) {
-                        setSyncStatus('Erro de Carregamento');
-                        return;
-                    }
+                    if (!window.FB_CORE) return;
 
                     const { initializeApp, getFirestore, getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } = window.FB_CORE;
                     
                     try {
+                        // Tenta pegar a config automática (Gemini) ou a manual (Vercel)
+                        let config;
                         const configStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
-                        if (!configStr) {
-                            setSyncStatus('Configuração Ausente');
+                        
+                        if (configStr) {
+                            config = JSON.parse(configStr);
+                        } else if (CONFIG_MANUAL_FIREBASE.projectId) {
+                            config = CONFIG_MANUAL_FIREBASE;
+                        } else {
+                            setSyncStatus('Faltam Chaves');
                             return;
                         }
 
-                        const config = JSON.parse(configStr);
                         const appInstance = initializeApp(config);
                         const authInstance = getAuth(appInstance);
                         const firestoreInstance = getFirestore(appInstance);
                         setDb(firestoreInstance);
 
-                        // Autentica ANTES de guardar o user
+                        // Auth
                         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                             await signInWithCustomToken(authInstance, __initial_auth_token);
                         } else {
@@ -124,130 +134,29 @@
                         onAuthStateChanged(authInstance, (u) => {
                             if (u) {
                                 setUser(u);
-                                setSyncStatus('Ligado');
-                            } else {
-                                setSyncStatus('Falha de Login');
+                                setSyncStatus('Online');
                             }
                         });
                     } catch (e) {
-                        console.error("Auth Erro:", e);
-                        setSyncStatus('Erro Crítico');
+                        setSyncStatus('Erro de Config');
                     }
                 };
                 initialize();
             }, []);
 
-            // --- Sincronização de Dados (Regra 1 e 2) ---
             useEffect(() => {
-                // SÓ corre se tiver user e db
                 if (!user || !db || !window.FB_CORE) return;
                 const { collection, onSnapshot } = window.FB_CORE;
-                
-                // REGRA 1: Caminho estrito público
                 const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'relatorios');
                 
                 const unsubscribe = onSnapshot(colRef, (snapshot) => {
-                    const data = snapshot.docs.map(doc => ({ 
-                        id: doc.id, 
-                        ...doc.data() 
-                    }));
-                    
-                    // REGRA 2: Ordenação manual em memória (mais estável)
-                    data.sort((a, b) => {
-                        const tA = a.localTimestamp || a.createdAt?.seconds || 0;
-                        const tB = b.localTimestamp || b.createdAt?.seconds || 0;
-                        return tB - tA;
-                    });
-                    
+                    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    data.sort((a, b) => (b.localTimestamp || 0) - (a.localTimestamp || 0));
                     setHistoryData(data);
-                    setSyncStatus('Actualizado');
-                }, (err) => {
-                    console.error("Listener Erro:", err);
-                    setSyncStatus('Erro de Permissão');
-                });
+                }, (err) => setSyncStatus('Erro Permissão'));
                 
                 return () => unsubscribe();
             }, [user, db]);
-
-            // --- Cálculos de Produção ---
-            const stats = useMemo(() => {
-                let limpos = 0;
-                let ferro = 0;
-                const turnosMap = { 'ADM': 0, 'T.C': 0, 'T.A': 0 };
-
-                historyData.forEach(rel => {
-                    const relItems = Array.isArray(rel.items) ? rel.items : [];
-                    relItems.forEach(it => {
-                        const l = Number(it.tubosLimpos) || 0;
-                        limpos += l;
-                        ferro += (Number(it.tubosComFerro) || 0);
-                        if (turnosMap[rel.turno] !== undefined) turnosMap[rel.turno] += l;
-                    });
-                });
-
-                return { limpos, ferro, turnosMap };
-            }, [historyData]);
-
-            // --- Gráficos do Dashboard ---
-            useEffect(() => {
-                if (view === 'dashboard' && historyData.length > 0) {
-                    const timer = setTimeout(() => {
-                        // Dados acumulados para o gráfico de pizza
-                        let tLimpos = 0, tObstruidos = 0, tFerro = 0;
-                        historyData.forEach(rel => {
-                            (rel.items || []).forEach(it => {
-                                tLimpos += (Number(it.tubosLimpos) || 0);
-                                tObstruidos += (Number(it.tubosObstruidos) || 0);
-                                tFerro += (Number(it.tubosComFerro) || 0);
-                            });
-                        });
-
-                        const ctxPie = document.getElementById('pieChart');
-                        if (ctxPie) {
-                            if (chartPieRef.current) chartPieRef.current.destroy();
-                            chartPieRef.current = new Chart(ctxPie, {
-                                type: 'doughnut',
-                                data: {
-                                    labels: ['Limpos', 'Obstruídos', 'Com Ferro'],
-                                    datasets: [{ data: [tLimpos, tObstruidos, tFerro], backgroundColor: ['#22c55e', '#ef4444', '#f59e0b'], borderWidth: 0 }]
-                                },
-                                options: { responsive: true, maintainAspectRatio: false, cutout: '75%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11, weight: 'bold' } } } } }
-                            });
-                        }
-
-                        const ctxBar = document.getElementById('barChart');
-                        if (ctxBar) {
-                            if (chartBarRef.current) chartBarRef.current.destroy();
-                            chartBarRef.current = new Chart(ctxBar, {
-                                type: 'bar',
-                                data: {
-                                    labels: ['ADM', 'T.C', 'T.A'],
-                                    datasets: [{
-                                        label: 'Tubos',
-                                        data: [stats.turnosMap['ADM'], stats.turnosMap['T.C'], stats.turnosMap['T.A']],
-                                        backgroundColor: '#1e40af',
-                                        borderRadius: 8
-                                    }]
-                                },
-                                options: { 
-                                    responsive: true, 
-                                    maintainAspectRatio: false, 
-                                    scales: { y: { beginAtZero: true, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 11, weight: 'bold' } } } }, 
-                                    plugins: { legend: { display: false } } 
-                                }
-                            });
-                        }
-                    }, 500);
-                    return () => clearTimeout(timer);
-                }
-            }, [view, historyData, stats]);
-
-            const equipamentosLista = [
-                '025A-TC-21A','025A-TC-21B','025A-TC-21C','025A-TC-21D','025A-TC-21E','025A-TC-21F',
-                '030-TC-001','030-TC-002','030-TC-003','030-TC-004','030-TC-005','030-TC-010',
-                '030-TC-11A','030-TC-11B','030-TC-22A','030-TC-22B','030-TC-24A','030-TC-24B',
-                '040-TC-011','042-TC-011','042-TC-039','030-VA-16'
-            ];
 
             const updateItem = (index, field, value) => {
                 const newItems = [...items];
@@ -255,34 +164,11 @@
                 setItems(newItems);
             };
 
-            const handleFileChange = (e, index, type) => {
-                const files = Array.from(e.target.files);
-                files.forEach(file => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        setItems(prev => {
-                            const updated = [...prev];
-                            const list = Array.isArray(updated[index][type]) ? updated[index][type] : [];
-                            updated[index] = { ...updated[index], [type]: [...list, reader.result] };
-                            return updated;
-                        });
-                    };
-                    reader.readAsDataURL(file);
-                });
-            };
-
             const handleSaveToCloud = async () => {
-                // Bloqueia se não estiver autenticado de verdade
-                if (!user || syncStatus === 'A conectar...') {
-                    alert("Aguarde a conexão com a nuvem ser estabelecida.");
-                    return;
-                }
-                
+                if (!db || !user) return;
                 setIsSaving(true);
-                
                 try {
                     const { collection, addDoc, serverTimestamp } = window.FB_CORE;
-                    
                     const payload = {
                         ...globalInfo,
                         items: items.map(it => ({
@@ -290,249 +176,139 @@
                             tubosLimpos: Number(it.tubosLimpos) || 0,
                             tubosObstruidos: Number(it.tubosObstruidos) || 0,
                             tubosComFerro: Number(it.tubosComFerro) || 0,
-                            impactos: it.impactos || '',
-                            fotosCount: (it.fotosAntes?.length || 0) + (it.fotosDepois?.length || 0)
+                            impactos: it.impactos || ''
                         })),
                         userId: user.uid,
                         localTimestamp: Date.now(),
-                        createdAt: serverTimestamp() // Timestamp do servidor
+                        createdAt: serverTimestamp()
                     };
 
-                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'relatorios');
-                    await addDoc(colRef, payload);
+                    await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'relatorios'), payload);
                     
                     setSaveSuccess(true);
                     setTimeout(() => {
                         setSaveSuccess(false);
                         setItems([{ ...initialItemState }]); 
-                        setView('dashboard'); // Redireciona para ver o dado aparecer
-                    }, 3000);
-
+                        setView('dashboard');
+                    }, 2000);
                 } catch (e) { 
-                    console.error("Erro ao gravar:", e);
-                    alert("Falha técnica ao gravar. Verifique sua rede.");
+                    alert("Erro ao gravar na nuvem.");
                 } finally {
                     setIsSaving(false);
                 }
             };
 
-            const handleExportCSV = () => {
-                if (historyData.length === 0) return;
-                let rows = ["Data,Empresa,Turno,TAG,Tubos Limpos,Obstruídos,Ferro,Impactos"];
-                historyData.forEach(rel => {
-                    (rel.items || []).forEach(it => {
-                        rows.push([rel.data, rel.empresa, rel.turno, it.equipamento, it.tubosLimpos, it.tubosObstruidos, it.tubosComFerro, `"${it.impactos}"`].join(","));
-                    });
-                });
-                const blob = new Blob([rows.join("\n")], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = `hidrocontrol_acumulado_${new Date().toISOString().split('T')[0]}.csv`;
-                link.click();
-            };
-
-            const handleSendWhatsApp = () => {
-                let msg = `*RELATÓRIO HIDROJATO - ${globalInfo.empresa.toUpperCase()}*%0A📅 Data: ${globalInfo.data}%0A🕒 Turno: ${globalInfo.turno}%0A%0A`;
-                items.forEach((it, idx) => {
-                    msg += `*${idx+1}. TAG: ${it.equipamento}*%0A✅ Limpos: ${it.tubosLimpos || 0}%0A❌ Obstruídos: ${it.tubosObstruidos || 0}%0A⚠️ Ferro: ${it.tubosComFerro || 0}%0A%0A`;
-                });
-                window.open(`https://wa.me/?text=${msg}`, '_blank');
-            };
-
             return (
-                <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-white border-x border-slate-100 shadow-xl">
-                    <header className="bg-blue-800 text-white p-6 sticky top-0 z-40 shadow-lg flex items-center justify-between rounded-b-3xl">
-                        <div className="flex items-center gap-3">
-                            <IconClipboard />
-                            <h1 className="font-bold text-xl tracking-tight uppercase tracking-tighter leading-none">Hidro<span className="text-blue-300">Control</span></h1>
+                <div className="min-h-screen flex flex-col max-w-lg mx-auto bg-slate-50 border-x border-slate-200 shadow-2xl relative">
+                    <header className="bg-blue-900 text-white p-6 sticky top-0 z-40 shadow-xl flex items-center justify-between rounded-b-[2.5rem]">
+                        <div>
+                            <h1 className="font-black text-2xl tracking-tighter">HIDRO<span className="text-blue-400">CONTROL</span></h1>
+                            <p className="text-[10px] font-bold opacity-50 tracking-widest uppercase">Sistema de Gestão Industrial</p>
                         </div>
-                        <div className="flex flex-col items-end">
-                            <div className="text-[10px] font-black bg-blue-900/40 px-3 py-1.5 rounded-xl border border-blue-500/50 uppercase leading-none mb-1">{globalInfo.data}</div>
-                            <div className={`text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded ${syncStatus === 'Ligado' || syncStatus === 'Actualizado' ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>{syncStatus}</div>
+                        <div className="text-right">
+                            <div className="text-[10px] font-black bg-blue-800 px-3 py-1.5 rounded-full border border-blue-700 uppercase mb-1">{globalInfo.data}</div>
+                            <div className={`text-[8px] font-black uppercase px-2 py-0.5 rounded ${syncStatus === 'Online' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{syncStatus}</div>
                         </div>
                     </header>
 
-                    <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-28">
-                        {view === 'dashboard' ? (
-                            <div className="animate-in fade-in duration-500 space-y-6">
-                                <div className="flex justify-between items-center">
-                                    <div className="flex flex-col">
-                                        <h2 className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">Visão de Produção</h2>
-                                        <span className="text-[9px] font-bold text-blue-600 uppercase mt-1 tracking-tighter">{historyData.length} registos sincronizados</span>
-                                    </div>
-                                    <button onClick={handleExportCSV} disabled={historyData.length === 0} className={`flex items-center gap-1.5 text-[10px] font-black px-3 py-1.5 rounded-lg border uppercase transition-all ${historyData.length > 0 ? 'text-blue-700 bg-blue-50 border-blue-100 hover:bg-blue-100 shadow-sm' : 'text-slate-300 opacity-50'}`}><IconDownload /> Excel</button>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center card-shadow transition-all hover:shadow-md">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Limpos Total</p>
-                                        <h4 className="text-3xl font-black text-blue-700 mt-2">{stats.limpos}</h4>
-                                    </div>
-                                    <div className="bg-white p-5 rounded-[2rem] border border-slate-100 text-center card-shadow transition-all hover:shadow-md">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Ferro Total</p>
-                                        <h4 className="text-3xl font-black text-red-600 mt-2">{stats.ferro}</h4>
-                                    </div>
-                                </div>
-
-                                <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-8 card-shadow">
-                                    <div className="text-center">
-                                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Qualidade Industrial</h3>
-                                        <div className="w-full h-[180px] relative"><canvas id="pieChart"></canvas></div>
-                                    </div>
-                                    <div className="pt-6 border-t border-slate-50 text-center">
-                                        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Produção por Turno</h3>
-                                        <div className="w-full h-[140px] relative"><canvas id="barChart"></canvas></div>
-                                    </div>
-                                </div>
-
-                                <section className="space-y-3">
-                                    <h3 className="text-[10px] font-black text-slate-400 uppercase text-center tracking-widest uppercase">Histórico Recente</h3>
-                                    {historyData.slice(0, 15).map((rel, rIdx) => (
-                                        <div key={rel.id || rIdx} className="bg-white p-4 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm animate-in slide-in-from-left">
-                                            <div className="flex flex-col">
-                                                <p className="text-xs font-black text-slate-700">{rel.data} - {rel.turno}</p>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase">{(rel.items || []).length} Equipamentos</p>
-                                            </div>
-                                            <div className="text-blue-700 font-bold text-[10px] uppercase bg-blue-50 px-2 py-1 rounded-md border border-blue-100 leading-none">{rel.empresa}</div>
-                                        </div>
-                                    ))}
-                                    {historyData.length === 0 && <div className="text-center py-10 opacity-40 italic text-[10px] uppercase tracking-widest">A aguardar dados da nuvem...</div>}
-                                </section>
-                            </div>
-                        ) : view === 'form' ? (
-                            /* --- FORMULÁRIO --- */
-                            <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 space-y-6">
+                    <main className="flex-grow p-4 space-y-6 overflow-y-auto hide-scroll pb-24">
+                        {view === 'form' ? (
+                            <div className="space-y-6">
                                 <section className="grid grid-cols-2 gap-3">
                                     {['Montisol', 'Constec'].map(e => (
-                                        <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-bold text-xs transition-all border ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>{e}</button>
+                                        <button key={e} onClick={() => setGlobalInfo({...globalInfo, empresa: e})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border-2 ${globalInfo.empresa === e ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100'}`}>{e}</button>
                                     ))}
                                 </section>
+                                
                                 <section className="grid grid-cols-3 gap-3">
                                     {['ADM', 'T.C', 'T.A'].map(t => (
-                                        <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-bold text-xs transition-all border ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg scale-105' : 'bg-white text-slate-500 border-slate-200'}`}>{t}</button>
+                                        <button key={t} onClick={() => setGlobalInfo({...globalInfo, turno: t})} className={`py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all border-2 ${globalInfo.turno === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100'}`}>{t}</button>
                                     ))}
                                 </section>
 
-                                <div className="space-y-8">
-                                    {items.map((item, idx) => (
-                                        <div key={idx} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-6 relative card-shadow border-t-4 border-t-blue-500 animate-in zoom-in-95">
-                                            {items.length > 1 && (<button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="absolute -top-4 -right-4 bg-red-500 text-white p-2.5 rounded-full shadow-xl transition-transform active:scale-90"><IconTrash /></button>)}
-                                            
-                                            <div className="relative">
-                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Equipamento (TAG)</label>
-                                                <input type="text" placeholder="Pesquisar..." value={item.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-bold text-sm transition-all" />
-                                                {activeDropdownIndex === idx && (
-                                                    <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">
-                                                        {equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (
-                                                            <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-bold text-sm text-slate-700 flex justify-between items-center cursor-pointer tracking-tighter transition-colors">{tag}</div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
+                                {items.map((item, idx) => (
+                                    <div key={idx} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 space-y-6 relative shadow-sm border-t-8 border-t-blue-600">
+                                        <div className="relative">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Equipamento (TAG)</label>
+                                            <input type="text" placeholder="Pesquisar..." value={item.equipamento} onFocus={() => setActiveDropdownIndex(idx)} onChange={(e) => updateItem(idx, 'equipamento', e.target.value.toUpperCase())} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-500/10 font-black text-blue-900" />
+                                            {activeDropdownIndex === idx && (
+                                                <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl max-h-48 overflow-y-auto tag-dropdown">
+                                                    {equipamentosLista.filter(tag => tag.includes(item.equipamento)).map(tag => (
+                                                        <div key={tag} onClick={() => { updateItem(idx, 'equipamento', tag); setActiveDropdownIndex(null); }} className="px-5 py-4 hover:bg-blue-50 border-b border-slate-50 font-black text-xs text-slate-700 cursor-pointer">{tag}</div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
 
-                                            <div className="grid grid-cols-3 gap-3">
-                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block leading-none">Limpos</label><input type="number" value={item.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg focus:ring-2 focus:ring-blue-500 transition-all shadow-inner" /></div>
-                                                <div className="space-y-1"><label className="text-[9px] font-bold text-slate-400 uppercase text-center block leading-none">Obs.</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-center font-bold text-lg focus:ring-2 focus:ring-blue-500 transition-all shadow-inner" /></div>
-                                                <div className="space-y-1"><label className="text-[9px] font-bold text-red-500 uppercase text-center block font-black leading-none">Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50/50 border border-red-100 rounded-2xl text-center font-bold text-lg text-red-600 focus:ring-2 focus:ring-red-500 transition-all shadow-inner" /></div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase text-center block">Limpos</label><input type="number" value={item.tubosLimpos} onChange={(e) => updateItem(idx, 'tubosLimpos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center font-black text-blue-600" /></div>
+                                            <div className="space-y-1"><label className="text-[9px] font-black text-slate-400 uppercase text-center block">Obs.</label><input type="number" value={item.tubosObstruidos} onChange={(e) => updateItem(idx, 'tubosObstruidos', e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-center font-black text-slate-400" /></div>
+                                            <div className="space-y-1"><label className="text-[9px] font-black text-red-500 uppercase text-center block">Ferro</label><input type="number" value={item.tubosComFerro} onChange={(e) => updateItem(idx, 'tubosComFerro', e.target.value)} placeholder="0" className="w-full p-4 bg-red-50 border border-red-100 rounded-2xl text-center font-black text-red-600" /></div>
+                                        </div>
+                                    </div>
+                                ))}
+                                
+                                <button onClick={() => setView('preview')} className="w-full bg-blue-900 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl active:scale-95 transition-all">Revisar e Enviar</button>
+                            </div>
+                        ) : view === 'dashboard' ? (
+                            <div className="space-y-6">
+                                <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 text-center">
+                                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-2">Produção Total (Tubos)</p>
+                                    <h2 className="text-5xl font-black text-blue-900">{historyData.reduce((acc, rel) => acc + (rel.items || []).reduce((a, i) => a + Number(i.tubosLimpos), 0), 0)}</h2>
+                                </div>
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">Histórico Recente</p>
+                                    {historyData.slice(0, 10).map(rel => (
+                                        <div key={rel.id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center justify-between shadow-sm">
+                                            <div>
+                                                <p className="text-xs font-black text-slate-800">{rel.data} - {rel.turno}</p>
+                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{(rel.items || []).length} Equipamentos • {rel.empresa}</p>
                                             </div>
-
-                                            <div className="grid grid-cols-2 gap-4">
-                                                {['fotosAntes', 'fotosDepois'].map(type => (
-                                                    <div key={type} className="space-y-2">
-                                                        <input type="file" multiple accept="image/*" className="hidden" id={`${type}-${idx}`} onChange={(e) => handleFileChange(e, idx, type)} />
-                                                        <label htmlFor={`${type}-${idx}`} className="flex flex-col items-center justify-center p-5 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl text-slate-400 cursor-pointer active:bg-slate-100 transition-all shadow-sm">
-                                                            <IconCamera />
-                                                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter">{type === 'fotosAntes' ? 'Antes' : 'Depois'}</span>
-                                                        </label>
-                                                        <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto pr-1">
-                                                            {(item[type] || []).map((pic, pIdx) => (
-                                                                <div key={pIdx} className="relative aspect-square border border-slate-100 rounded-xl overflow-hidden shadow-sm">
-                                                                    <img src={pic} className="image-preview" />
-                                                                    <button onClick={() => { 
-                                                                        const n = [...items]; 
-                                                                        n[idx][type].splice(pIdx,1); 
-                                                                        setItems(n); 
-                                                                    }} className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-0.5 scale-75 shadow-md transition-transform hover:scale-90"><IconX /></button>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <textarea value={item.impactos} onChange={(e) => updateItem(idx, 'impactos', e.target.value)} placeholder="Descreva dificuldades identificadas..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium transition-all shadow-inner"></textarea>
+                                            <div className="text-blue-600 font-black text-xs">+{ (rel.items || []).reduce((a,i) => a + Number(i.tubosLimpos), 0) }</div>
                                         </div>
                                     ))}
                                 </div>
-                                
-                                <button onClick={() => setItems([...items, { ...initialItemState }])} className="w-full py-5 rounded-[2.5rem] bg-white border-2 border-dashed border-blue-200 text-blue-600 font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-2 shadow-md active:scale-95 transition-all leading-none"><IconPlus /> Novo Equipamento</button>
-                                <button onClick={() => setView('preview')} disabled={items.some(i => !i.equipamento)} className="w-full bg-blue-800 text-white py-6 rounded-[2.5rem] font-bold uppercase tracking-[0.15em] text-xs shadow-2xl active:scale-95 transition-all disabled:opacity-30 leading-none">Revisar Relatório</button>
                             </div>
                         ) : (
-                            /* --- PREVIEW --- */
-                            <div className="animate-in fade-in zoom-in-95 duration-300 space-y-6 pt-2 text-sm relative">
-                                {saveSuccess && (
-                                    <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6">
-                                        <div className="bg-white p-10 rounded-[3rem] text-center space-y-4 shadow-2xl border border-blue-100 scale-110">
-                                            <div className="bg-green-500 text-white w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-xl scale-110"><IconCheck /></div>
-                                            <div>
-                                                <h3 className="text-blue-900 font-black uppercase text-lg tracking-tight">Registo Arquivado!</h3>
-                                                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mt-2 leading-tight">O histórico industrial foi actualizado.<br/>Actualizando Dashboard...</p>
+                            <div className="space-y-6">
+                                <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border-4 border-slate-800 text-white relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10"><IconClipboard /></div>
+                                    <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest mb-6 border-b border-white/10 pb-4">Consolidado do Turno</h2>
+                                    {items.map((it, i) => (
+                                        <div key={i} className="mb-6 last:mb-0">
+                                            <p className="text-white font-black text-sm uppercase mb-1">{it.equipamento}</p>
+                                            <div className="flex gap-4 font-mono text-[10px] font-bold">
+                                                <span className="text-green-400">LIMPOS: {it.tubosLimpos || 0}</span>
+                                                <span className="text-slate-500">OBS: {it.tubosObstruidos || 0}</span>
+                                                <span className="text-red-400">FERRO: {it.tubosComFerro || 0}</span>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
-                                
-                                <div className="bg-slate-900 p-8 rounded-[3.5rem] shadow-2xl border border-slate-800 space-y-6 leading-none">
-                                    <div className="flex justify-between items-start border-b border-slate-800 pb-4">
-                                        <div className="space-y-1">
-                                            <h2 className="text-blue-400 font-black uppercase text-[10px] tracking-widest leading-none">Resumo Consolidado</h2>
-                                            <p className="text-slate-500 text-[10px] font-bold uppercase tracking-tighter">{globalInfo.data} • Turno {globalInfo.turno}</p>
-                                        </div>
-                                        <span className="text-white font-black text-[9px] uppercase bg-blue-600 px-3 py-1 rounded-full border border-blue-400/30 leading-none">{globalInfo.empresa}</span>
-                                    </div>
-                                    
-                                    <div className="space-y-6 max-h-[300px] overflow-y-auto pr-2 hide-scroll">
-                                        {Array.isArray(items) && items.map((it, i) => (
-                                            <div key={i} className="font-mono text-xs border-b border-slate-800/50 pb-4 last:border-none">
-                                                <p className="text-blue-300 font-black mb-3 uppercase tracking-tighter">{i+1}. TAG: {it.equipamento}</p>
-                                                <div className="grid grid-cols-2 gap-y-1.5 pl-3">
-                                                    <span className="text-slate-500 italic uppercase text-[9px]">Limpos:</span> <span className="text-green-400 font-bold">{it.tubosLimpos || 0}</span>
-                                                    <span className="text-slate-500 italic uppercase text-[9px]">Fotos:</span> <span className="text-slate-300">{(it.fotosAntes || []).length + (it.fotosDepois || []).length} total</span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    ))}
                                 </div>
-                                
-                                <div className="flex flex-col gap-3 pb-8">
-                                    <button 
-                                        onClick={handleSaveToCloud} 
-                                        disabled={isSaving || saveSuccess || !user} 
-                                        className="w-full bg-blue-700 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-[0.1em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50 leading-none"
-                                    >
-                                        {isSaving ? 'Gravando...' : <><IconSave /> Finalizar e Gravar na Cloud</>}
-                                    </button>
-                                    
-                                    <div className="flex gap-4">
-                                        <button onClick={() => setView('form')} disabled={saveSuccess} className="flex-1 bg-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] border border-slate-200 text-slate-400 shadow-sm transition-all hover:bg-slate-50 leading-none">Editar</button>
-                                        <button onClick={handleSendWhatsApp} disabled={saveSuccess} className="flex-[2] bg-green-500 text-white py-5 rounded-[2.5rem] font-black uppercase text-[10px] flex items-center justify-center gap-2 shadow-lg transition-all hover:bg-green-600 leading-none">
-                                            <IconSend /> WhatsApp
-                                        </button>
-                                    </div>
-                                    {!user && <p className="text-center text-[9px] text-red-400 font-black uppercase animate-pulse mt-2 tracking-widest leading-none">A aguardar ligação à nuvem...</p>}
-                                </div>
+                                <button onClick={handleSaveToCloud} disabled={isSaving || syncStatus !== 'Online'} className="w-full bg-blue-600 text-white py-6 rounded-[2.5rem] font-black uppercase text-[10px] shadow-xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30 transition-all">
+                                    {isSaving ? 'Gravando...' : <><IconSave /> Finalizar e Salvar na Cloud</>}
+                                </button>
+                                <button onClick={() => setView('form')} className="w-full text-slate-400 font-black uppercase text-[9px] tracking-widest">Voltar para Editar</button>
                             </div>
                         )}
                     </main>
 
-                    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white/95 backdrop-blur-md border-t border-slate-100 px-14 py-5 flex justify-around items-center z-40 rounded-t-[3rem] shadow-[0_-10px_30px_rgba(0,0,0,0.05)]">
-                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view !== 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
-                            <IconClipboard />
-                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter font-bold leading-none">Relatório</span>
+                    {saveSuccess && (
+                        <div className="success-overlay fixed inset-0 z-50 flex items-center justify-center p-6">
+                            <div className="bg-white p-12 rounded-[4rem] text-center shadow-2xl animate-in zoom-in duration-300">
+                                <div className="bg-green-500 text-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl"><IconCheck /></div>
+                                <h3 className="text-blue-900 font-black uppercase text-xl tracking-tighter">Registo Salvo!</h3>
+                                <p className="text-slate-400 text-xs font-bold mt-2 uppercase tracking-widest">A sincronizar dados...</p>
+                            </div>
+                        </div>
+                    )}
+
+                    <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-white/90 backdrop-blur-xl border-t border-slate-100 px-10 py-5 flex justify-around items-center z-40 rounded-t-[3rem] shadow-2xl">
+                        <button onClick={() => setView('form')} className={`flex flex-col items-center transition-all ${view !== 'dashboard' ? 'text-blue-900 scale-110' : 'text-slate-300'}`}>
+                            <IconClipboard /><span className="text-[8px] font-black uppercase mt-1">Lançar</span>
                         </button>
-                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-800 scale-110' : 'text-slate-300'}`}>
-                            <IconChart />
-                            <span className="text-[9px] font-black uppercase mt-1 tracking-tighter font-bold leading-none">Dashboard</span>
+                        <button onClick={() => setView('dashboard')} className={`flex flex-col items-center transition-all ${view === 'dashboard' ? 'text-blue-900 scale-110' : 'text-slate-300'}`}>
+                            <IconChart /><span className="text-[8px] font-black uppercase mt-1">Dashboard</span>
                         </button>
                     </nav>
                 </div>
