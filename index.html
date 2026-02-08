@@ -18,24 +18,27 @@ import {
   Calendar
 } from 'lucide-react';
 
-/**
- * --- CONFIGURAÇÃO FIREBASE INDUSTRIAL (ALAN ALVES) ---
- * Configurada com a sua chave real para funcionamento direto no Vercel.
- */
-const firebaseConfig = {
-  apiKey: "AIzaSyAPM1NNw9PazMccz5kxZjFAqOYKLqQwLxo",
-  authDomain: "hidrocontrol-alumar.firebaseapp.com",
-  projectId: "hidrocontrol-alumar",
-  storageBucket: "hidrocontrol-alumar.firebasestorage.app",
-  messagingSenderId: "1080945827345",
-  appId: "1:1080945827345:web:bd083793e95f943cb25bb0"
+// --- CONFIGURAÇÃO INTELIGENTE (GEMINI + VERCEL) ---
+const getFirebaseConfig = () => {
+  // Se estiver no Gemini, usa a config do ambiente. Se não, usa a chave do Alan.
+  if (typeof __firebase_config !== 'undefined') {
+    return JSON.parse(__firebase_config);
+  }
+  return {
+    apiKey: "AIzaSyAPM1NNw9PazMccz5kxZjFAqOYKLqQwLxo",
+    authDomain: "hidrocontrol-alumar.firebaseapp.com",
+    projectId: "hidrocontrol-alumar",
+    storageBucket: "hidrocontrol-alumar.firebasestorage.app",
+    messagingSenderId: "1080945827345",
+    appId: "1:1080945827345:web:bd083793e95f943cb25bb0"
+  };
 };
 
-// Inicialização única e segura
+const firebaseConfig = getFirebaseConfig();
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const appIdKey = 'hidrocontrol-alumar';
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'hidrocontrol-alumar';
 const ADMIN_EMAIL = "alanlindoso1@gmail.com";
 
 // --- MAPEAMENTO DE ÁREAS E TAGS ---
@@ -51,7 +54,6 @@ const AREA_TAG_MAPPING = {
     "042III": ["042-TC-031", "042-TC-032", "042-TC-033", "042-TC-034", "042-TC-035", "042-TC-036", "042-TC-037", "042-TC-038", "042-TC-039"]
 };
 
-// --- MAPEAMENTO DE TOTAIS DE TUBOS ---
 const EQUIPAMENTOS_DADOS = {
     "025A-TC-21A": 33, "025A-TC-21B": 33, "025A-TC-21C": 33, "025A-TC-21D": 33, "025A-TC-21E": 33, "025A-TC-21F": 33,
     "025A-TC-31A": 33, "025A-TC-31B": 33, "025A-TC-31C": 33, "025A-TC-31D": 33, "025A-TC-31E": 33, "025A-TC-31F": 33, "030-TC-001": 600, "030-TC-002": 880, "030-TC-003": 880, "030-TC-004": 880, "030-TC-005": 880, "030-TC-006": 880, "030-TC-007": 880, "030-TC-008": 880, "030-TC-009": 1000, "030-TC-010": 1000, "030-TC-019": 600, "030-TC-029": 600, "030-TC-11A": 180, "030-TC-11B": 180, "030-TC-11C": 180, "030-TC-11D": 180, "030-TC-11E": 180, "030-TC-11F": 180, "030-TC-12A": 180, "030-TC-12B": 180, "030-TC-12C": 180, "030-TC-12D": 180, "030-TC-12E": 180, "030-TC-12F": 180, "030-TC-13A": 180, "030-TC-13B": 180, "030-TC-13C": 180, "030-TC-13D": 180, "030-TC-13E": 180, "030-TC-13F": 180, "030-TC-17A": 33, "030-TC-17B": 33, "030-TC-17C": 33, "030-TC-17D": 33, "030-TC-17E": 33, "030-TC-17F": 33, "030-TC-18A": 33, "030-TC-18B": 33, "030-TC-18C": 33, "030-TC-18D": 33, "030-TC-18E": 33, "030-TC-18F": 33, "030-TC-21A": 180, "030-TC-21B": 180, "030-TC-22A": 180, "030-TC-22B": 180, "030-TC-22C": 180, "030-TC-22D": 180, "030-TC-23A": 180, "030-TC-23B": 180, "030-TC-23C": 180, "030-TC-23D": 180, "030-TC-24A": 180, "030-TC-24B": 180, "030-TC-24C": 180, "030-TC-24D": 180, "030-TC-25A": 180, "030-TC-25B": 180, "030-TC-25C": 180, "030-TC-25D": 180, "030-TC-26A": 180, "030-TC-26B": 180, "030-TC-26C": 180, "030-TC-26D": 180, "030-TC-26E": 180, "030-TC-26F": 180, "030-TC-31A": 180, "030-TC-31B": 180, "030-TC-32A": 180, "030-TC-32B": 180, "030-TC-32C": 180, "030-TC-32D": 180, "030-TC-33A": 180, "030-TC-33B": 180, "030-TC-33C": 180, "030-TC-33D": 180, "030-TC-34A": 180, "030-TC-34B": 180, "030-TC-34C": 180, "030-TC-34D": 180, "030-TC-35A": 180, "030-TC-35B": 180, "030-TC-35C": 180, "030-TC-35D": 180, "030-TC-36A": 180, "030-TC-36B": 180, "030-TC-36C": 180, "030-TC-36D": 180, "030-TC-36E": 180, "030-TC-36F": 180, "030-TC-41A": 180, "030-TC-41B": 180, "030-TC-42A": 180, "030-TC-42B": 180, "030-TC-42C": 180, "030-TC-42D": 180, "030-TC-43A": 180, "030-TC-43B": 180, "030-TC-43C": 180, "030-TC-43D": 180, "030-TC-44A": 180, "030-TC-44B": 180, "030-TC-44C": 180, "030-TC-44D": 180, "030-TC-45A": 180, "030-TC-45B": 180, "030-TC-45C": 180, "030-TC-45D": 180, "030-TC-46A": 180, "030-TC-46B": 180, "030-TC-46C": 180, "030-TC-46D": 180, "030-TC-46E": 180, "030-TC-46F": 180, "040-TC-011": 1000, "040-TC-012": 1000, "040-TC-013": 1000, "040-TC-014": 1000, "040-TC-015": 1000, "040-TC-021": 1000, "040-TC-022": 1000, "040-TC-023": 1000, "040-TC-024": 1000, "040-TC-025": 1000, "040-TC-031": 1000, "040-TC-032": 1000, "040-TC-033": 1000, "040-TC-034": 1000, "040-TC-035": 1000, "040K-TC-011": 1000, "042-TC-011": 1000, "042-TC-012": 1000, "042-TC-013": 1000, "042-TC-014": 1000, "042-TC-015": 1000, "042-TC-016": 1000, "042-TC-017": 1000, "042-TC-018": 1000, "042-TC-019": 1000, "042-TC-021": 1000, "042-TC-022": 1000, "042-TC-023": 1000, "042-TC-024": 1000, "042-TC-025": 1000, "042-TC-026": 1000, "042-TC-027": 1000, "042-TC-028": 1000, "042-TC-029": 1000, "042-TC-031": 1000, "042-TC-032": 1000, "042-TC-033": 1000, "042-TC-034": 1000, "042-TC-035": 1000, "042-TC-036": 1000, "042-TC-037": 1000, "042-TC-038": 1000, "042-TC-039": 1000
@@ -59,9 +61,6 @@ const EQUIPAMENTOS_DADOS = {
 
 const AREAS_OPERACIONAIS_LISTA = Object.keys(AREA_TAG_MAPPING);
 const EQUIPAMENTOS_LISTA = Object.keys(EQUIPAMENTOS_DADOS);
-
-// --- ÍCONE WHATSAPP ---
-const IconWA = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-2.203 0-3.991 1.789-3.991 3.991 0 .86.273 1.656.74 2.308l-.513 1.874 1.921-.504a3.978 3.978 0 0 0 1.843.456c2.203 0 3.991-1.789 3.991-3.991 0-2.203-1.788-3.991-3.991-3.991zm2.348 5.617c-.1.282-.578.536-.795.568-.217.032-.435.056-1.258-.266-.822-.323-1.354-1.157-1.394-1.212-.04-.054-.33-.44-.33-.84s.21-.6.284-.68c.074-.08.162-.1.216-.1.054 0 .108 0 .156.006.054.004.12.004.186.162.066.162.228.552.246.594.018.042.03.09.006.138-.024.048-.042.084-.126.18-.084.096-.15.162-.222.246-.078.078-.156.168-.066.324.09.156.39.642.84 1.044.576.516 1.062.678 1.212.75.15.072.24.06.33-.042.09-.102.39-.456.492-.612.102-.156.204-.132.342-.084.138.048.876.414 1.026.492.15.078.252.114.288.18.036.066.036.384-.066.666z"/></svg>;
 
 const App = () => {
     const [user, setUser] = useState(null);
@@ -72,7 +71,6 @@ const App = () => {
     const [historyFilter, setHistoryFilter] = useState('0'); 
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
     
-    // Estados do Formulário
     const [company, setCompany] = useState('MONTISOL');
     const [turno, setTurno] = useState('ADM');
     const [area, setArea] = useState('');
@@ -83,16 +81,23 @@ const App = () => {
 
     const containerRef = useRef(null);
 
-    // --- AUTENTICAÇÃO COM FALLBACK RESILIENTE ---
+    // --- AUTENTICAÇÃO MESTRA (RULE 3) ---
     useEffect(() => {
         const initAuth = async () => {
             try {
-                // Tenta autenticar anónimamente para garantir carregamento da UI
-                await signInAnonymously(auth);
-            } catch (error) { 
-                console.warn("Firebase Auth Error:", error.code);
-                // Fallback: Se falhar (admin-restricted), cria um utilizador local fake para a UI renderizar
-                setUser({ uid: 'local-user', isAnonymous: true });
+                // Prioridade 1: Token do Gemini (se disponível)
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    try {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } catch (e) { await signInAnonymously(auth); }
+                } else {
+                    // Prioridade 2: Login Anónimo (Vercel)
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Auth Erro:", error);
+                // Fallback final para não travar a UI
+                setUser({ uid: 'local-mode', isAnonymous: true });
             }
         };
         initAuth();
@@ -103,11 +108,11 @@ const App = () => {
     // --- CARREGAMENTO DE DADOS ---
     useEffect(() => {
         if (!user) return;
-        const q = collection(db, 'artifacts', appIdKey, 'public', 'data', 'registos');
+        const q = collection(db, 'artifacts', appId, 'public', 'data', 'registos');
         const unsub = onSnapshot(q, (snap) => {
             const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setHistory(data.sort((a,b) => b.ts - a.ts));
-        }, (err) => console.error("Firestore Error:", err));
+        }, (err) => console.error("Firestore Erro:", err));
         return () => unsub();
     }, [user]);
 
@@ -168,9 +173,9 @@ const App = () => {
                 user: user.email || "Operador",
                 items: items.map(i => ({ tag: i.tag, limpos: i.limpos, ferro: i.ferro || 0, totalTag: i.totalTag, notes: i.notes }))
             };
-            await addDoc(collection(db, 'artifacts', appIdKey, 'public', 'data', 'registos'), docData);
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'registos'), docData);
             setView('success');
-        } catch (e) { console.error("Save Fail:", e); }
+        } catch (e) { console.error("Erro Save:", e); }
         setLoading(false);
     };
 
@@ -191,17 +196,17 @@ const App = () => {
         });
         const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
-        link.download = `HidroControl_Full_Base.csv`; link.click();
+        link.download = `HidroControl_Full_Report.csv`; link.click();
     };
 
-    const isAdmin = user?.email === ADMIN_EMAIL || user?.isAnonymous === true;
+    const isAdmin = user?.email === ADMIN_EMAIL || user?.isAnonymous;
 
     if (!user) return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 text-white">
-            <div className="glass-dark w-full max-w-sm p-12 rounded-[4rem] text-center space-y-6 shadow-2xl border border-white/5">
+        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 text-white text-center">
+            <div className="glass-dark p-12 rounded-[4rem] shadow-2xl border border-white/5 space-y-6">
                 <h1 className="font-black text-4xl italic tracking-tighter uppercase leading-none text-blue-500">Hidro<span className="text-white">Control</span></h1>
                 <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="text-[10px] opacity-40 uppercase tracking-widest font-black">Iniciando HidroControl Ultimate...</p>
+                <p className="text-[10px] opacity-40 uppercase tracking-widest font-black">Conectando Alumar Cloud...</p>
             </div>
         </div>
     );
@@ -217,14 +222,12 @@ const App = () => {
                             <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border-2 border-green-500/20">
                                 <CheckCircle2 size={40} className="text-green-500" />
                             </div>
-                            <div className="space-y-2">
-                                <h2 className="text-2xl font-black uppercase italic leading-none text-white tracking-tighter">SINCRONIZADO!</h2>
-                                <p className="text-sm opacity-40 text-slate-300">Registo armazenado com sucesso.</p>
-                            </div>
+                            <h2 className="text-2xl font-black uppercase italic leading-none text-white tracking-tighter text-center leading-none">SINCRONIZADO!</h2>
+                            <p className="text-sm opacity-40 text-slate-300">Registo armazenado em nuvem.</p>
                         </div>
                         <div className="space-y-4">
-                            <button onClick={() => window.open(getWhatsAppLink(history[0]), '_blank')} className="w-full bg-green-600 py-6 rounded-3xl font-black uppercase text-xs flex items-center justify-center gap-3 active:scale-95 shadow-lg shadow-green-600/20"><Send size={18} /> Enviar WhatsApp</button>
-                            <button onClick={() => { setView('form'); setArea(''); setAreaSearch(''); setItems([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }]); }} className={`w-full py-5 rounded-3xl font-black uppercase text-[10px] border border-white/10 text-white tracking-widest active:scale-95`}>Confirmar e Sair</button>
+                            <button onClick={() => window.open(getWhatsAppLink(history[0]), '_blank')} className="w-full bg-green-600 py-6 rounded-3xl font-black uppercase text-xs flex items-center justify-center gap-3 active:scale-95 shadow-lg"><Send size={18} /> Enviar WhatsApp</button>
+                            <button onClick={() => { setView('form'); setArea(''); setAreaSearch(''); setItems([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }]); }} className="w-full py-5 rounded-3xl font-black uppercase text-[10px] border border-white/10 text-white active:scale-95">Confirmar e Sair</button>
                         </div>
                     </div>
                 </div>
@@ -237,7 +240,7 @@ const App = () => {
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => setDarkMode(!darkMode)} className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${darkMode ? 'border-white/10' : 'border-slate-300'}`}>{darkMode ? '☀️' : '🌙'}</button>
-                    <button onClick={() => signOut(auth)} className="bg-red-500/10 text-red-500 text-[9px] font-black uppercase px-4 py-2 rounded-xl border border-red-500/20 active:scale-90">Sair</button>
+                    <button onClick={() => signOut(auth)} className="bg-red-500/10 text-red-500 text-[9px] font-black uppercase px-4 py-2 rounded-xl border border-red-500/20 active:scale-90 transition-all">Sair</button>
                 </div>
             </header>
 
@@ -257,16 +260,16 @@ const App = () => {
 
                         <section className="glass-dark p-8 rounded-[2.5rem] shadow-xl border border-white/5 relative dropdown-container">
                             <div className="space-y-2 relative">
-                                <label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500 tracking-widest leading-none mb-1 block">Área Operacional</label>
+                                <label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500 tracking-widest">Área Operacional</label>
                                 <div className="relative">
                                     <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
-                                    <input type="text" placeholder="SELECIONE A ÁREA..." value={areaSearch} onFocus={() => setShowAreaList(true)} onChange={(e) => { const v = e.target.value.toUpperCase(); setAreaSearch(v); setArea(v); }} className="w-full pl-12 pr-5 py-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400" />
+                                    <input type="text" placeholder="BUSCAR ÁREA..." value={areaSearch} onFocus={() => setShowAreaList(true)} onChange={(e) => { const v = e.target.value.toUpperCase(); setAreaSearch(v); setArea(v); }} className="w-full pl-12 pr-5 py-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400 placeholder-slate-800" />
                                 </div>
                                 {showAreaList && (
                                     <div className="absolute z-[120] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-2xl border border-blue-500/40 overflow-hidden">
                                         <div className="max-h-48 overflow-y-auto dropdown-scroll">
                                             {AREAS_OPERACIONAIS_LISTA.filter(a => a.includes(areaSearch)).map(a => (
-                                                <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-black text-white border-b border-white/5 cursor-pointer flex justify-between transition-all"><span>{a}</span><span className="text-[7px] opacity-30 font-black">SELECIONAR</span></div>
+                                                <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-black text-white border-b border-white/5 cursor-pointer flex justify-between transition-all transition-colors"><span>{a}</span><span className="text-[7px] opacity-30 font-black">SELECIONAR</span></div>
                                             ))}
                                         </div>
                                     </div>
@@ -291,68 +294,61 @@ const App = () => {
                                         <div className="absolute z-[110] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-2xl border border-blue-500/30 overflow-hidden">
                                             <div className="max-h-60 overflow-y-auto dropdown-scroll">
                                                 {(AREA_TAG_MAPPING[area] || EQUIPAMENTOS_LISTA).filter(t => t.includes(it.search)).map(tag => (
-                                                    <div key={tag} onClick={() => { updateItem(idx, 'tag', tag); updateItem(idx, 'search', tag); updateItem(idx, 'showList', false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-bold text-white border-b border-white/5 cursor-pointer flex justify-between transition-colors"><span>{tag}</span><span className="text-[7px] opacity-20 font-black">SELECIONAR</span></div>
+                                                    <div key={tag} onClick={() => { updateItem(idx, 'tag', tag); updateItem(idx, 'search', tag); updateItem(idx, 'showList', false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-bold text-white border-b border-white/5 cursor-pointer flex justify-between transition-colors transition-all"><span>{tag}</span><span className="text-[7px] opacity-20 font-black text-slate-300">SELECIONAR</span></div>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
-                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-green-500 text-center block tracking-tighter mb-1">Limpos</label><input type="number" value={it.limpos} onChange={e => updateItem(idx, 'limpos', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-white border border-slate-900 shadow-inner" placeholder="0" /></div>
-                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-red-500 text-center block tracking-tighter mb-1 italic">C. Ferro</label><input type="number" value={it.ferro} onChange={e => updateItem(idx, 'ferro', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-red-500 border border-red-900/30 shadow-inner" placeholder="0" /></div>
-                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase opacity-40 text-center block tracking-tighter mb-1">Total</label><input type="number" value={it.totalTag} onChange={e => updateItem(idx, 'totalTag', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-slate-500 border border-slate-900" /></div>
+                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-green-500 text-center block tracking-tighter leading-none mb-1">Limpos</label><input type="number" value={it.limpos} onChange={e => updateItem(idx, 'limpos', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-white border border-slate-900 shadow-inner outline-none" placeholder="0" /></div>
+                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-red-500 text-center block tracking-tighter leading-none mb-1 italic">C. Ferro</label><input type="number" value={it.ferro} onChange={e => updateItem(idx, 'ferro', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-red-500 border border-red-900/30 shadow-inner outline-none" placeholder="0" /></div>
+                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase opacity-40 text-center block tracking-tighter leading-none mb-1">Total</label><input type="number" value={it.totalTag} onChange={e => updateItem(idx, 'totalTag', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-slate-500 border border-slate-900 outline-none" /></div>
                                 </div>
-                                <div className="space-y-3 pt-2 border-t border-white/5">
-                                    <label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500 tracking-widest leading-none mb-1 block">Evidências de Campo (Máx 4)</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <label className="flex items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-white/10 cursor-pointer bg-slate-950 hover:bg-blue-600/10 transition-all"><Camera size={20} /><span className="text-[9px] font-black uppercase text-slate-400">Antes</span><input type="file" className="hidden" accept="image/*" capture="environment" /></label>
-                                        <label className="flex items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-white/10 cursor-pointer bg-slate-950 hover:bg-green-600/10 transition-all"><Camera size={20} /><span className="text-[9px] font-black uppercase text-slate-400">Depois</span><input type="file" className="hidden" accept="image/*" capture="environment" /></label>
-                                    </div>
-                                </div>
-                                <div className="space-y-1"><label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500 tracking-widest block leading-none mb-1">Notas Técnicas</label><textarea placeholder="Detalhes, pendências ou impactos..." value={it.notes} onChange={e => updateItem(idx, 'notes', e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 outline-none font-bold text-xs h-28 resize-none text-slate-300"></textarea></div>
+                                <div className="space-y-1"><label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500 tracking-widest block leading-none mb-1">Notas de Atividade</label><textarea placeholder="Relate detalhes, pendências ou impactos..." value={it.notes} onChange={e => updateItem(idx, 'notes', e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 outline-none font-bold text-xs h-28 resize-none text-slate-300"></textarea></div>
                             </section>
                         ))}
-                        <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }])} className="w-full py-6 border-2 border-dashed border-blue-500/40 rounded-3xl text-blue-500 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2"><PlusCircle size={18} /> Adicionar Nova TAG</button>
-                        <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] transition-all active:scale-95 flex items-center justify-center gap-3">{loading ? 'SINCRONIZANDO...' : <><Send size={20} /> Salvar Relatório Profissional</>}</button>
+                        <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }])} className="w-full py-6 border-2 border-dashed border-blue-500/40 rounded-3xl text-blue-500 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 transition-colors"><PlusCircle size={18} /> Adicionar Nova TAG</button>
+                        <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] transition-all active:scale-95 flex items-center justify-center gap-3 transition-colors">{loading ? 'SINCRONIZANDO...' : <><Send size={20} /> Salvar Relatório Profissional</>}</button>
                     </div>
                 )}
 
                 {view === 'history' && (
-                    <div className="space-y-6 animate-pop">
+                    <div className="space-y-6 animate-pop pb-12">
                         <div className="glass-dark p-6 rounded-[2.5rem] border border-white/5 space-y-4 shadow-xl">
                             <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2 hide-scroll no-scrollbar">
                                 {[{l: 'Hoje', v: '0'}, {l: '3 Dias', v: '3'}, {l: '7 Dias', v: '7'}, {l: '15 Dias', v: '15'}, {l: 'Personalizado', v: 'custom'}].map(f => (
-                                    <button key={f.v} onClick={() => setHistoryFilter(f.v)} className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase whitespace-nowrap transition-all ${historyFilter === f.v ? 'bg-blue-600 text-white shadow-lg' : 'bg-white/5 text-slate-500 border border-white/5'}`}>{f.l}</button>
+                                    <button key={f.v} onClick={() => setHistoryFilter(f.v)} className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase whitespace-nowrap transition-all ${historyFilter === f.v ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-white/5 text-slate-500 border border-white/5 transition-colors'}`}>{f.l}</button>
                                 ))}
                             </div>
                             {historyFilter === 'custom' && (
                                 <div className="grid grid-cols-2 gap-3 animate-pop pt-2">
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase text-slate-500 ml-2">Início</label>
-                                        <input type="date" value={dateRange.start} onChange={(e) => setDateRange({...dateRange, start: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-white/5 text-xs font-bold text-blue-400 outline-none" />
+                                        <label className="text-[8px] font-black uppercase text-slate-500 ml-2 tracking-widest">Início</label>
+                                        <input type="date" value={dateRange.start} onChange={(e) => setDateRange({...dateRange, start: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-white/5 text-xs font-bold text-blue-400 outline-none transition-colors" />
                                     </div>
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase text-slate-500 ml-2">Fim</label>
-                                        <input type="date" value={dateRange.end} onChange={(e) => setDateRange({...dateRange, end: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-white/5 text-xs font-bold text-blue-400 outline-none" />
+                                        <label className="text-[8px] font-black uppercase text-slate-500 ml-2 tracking-widest">Fim</label>
+                                        <input type="date" value={dateRange.end} onChange={(e) => setDateRange({...dateRange, end: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-white/5 text-xs font-bold text-blue-400 outline-none transition-colors" />
                                     </div>
                                 </div>
                             )}
                         </div>
-                        <div className="space-y-4 pb-12">
+                        <div className="space-y-4">
                             {filteredHistory.map(h => (
                                 <div key={h.id} className="glass-dark p-8 rounded-[3.5rem] border border-white/5 shadow-2xl relative overflow-hidden group">
-                                    <div className="flex justify-between items-start">
-                                        <div className="space-y-1 text-slate-300">
+                                    <div className="flex justify-between items-start text-slate-300">
+                                        <div className="space-y-1">
                                             <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">{h.company}</p>
                                             <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none">{h.items?.[0]?.tag}</h4>
                                             <p className="text-[9px] font-bold opacity-30 uppercase flex items-center gap-2"><Calendar size={10} /> {h.data} • <Clock size={10} /> {h.hora} • {h.turno}</p>
                                         </div>
-                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className="w-12 h-12 bg-green-500/20 text-green-500 rounded-2xl flex items-center justify-center border border-green-500/20 active:scale-90 transition-all shadow-lg"><IconWA /></button>
+                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className="w-12 h-12 bg-green-500/20 text-green-500 rounded-2xl flex items-center justify-center border border-green-500/20 active:scale-90 transition-all shadow-lg shadow-green-500/10 transition-colors"><IconWA /></button>
                                     </div>
-                                    <div className="bg-slate-950/50 p-6 rounded-[2rem] border border-white/5 space-y-4 mt-4 text-slate-300">
+                                    <div className="bg-slate-950/50 p-6 rounded-[2rem] border border-white/5 space-y-4 mt-4 text-slate-300 text-center">
                                         {(h.items || []).map((it, idx) => (
                                             <div key={idx} className="flex justify-between items-center border-b border-white/5 last:border-none pb-4 last:pb-0">
-                                                <div className="space-y-1">
+                                                <div className="space-y-1 text-left">
                                                     <p className="text-[11px] font-black uppercase text-blue-400">{it.tag}</p>
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-20 h-1.5 bg-white/5 rounded-full overflow-hidden">
@@ -367,7 +363,7 @@ const App = () => {
                                     </div>
                                     {h.items?.[0]?.notes && (
                                         <div className="mt-4 px-2">
-                                            <p className="text-[8px] font-black uppercase opacity-20 mb-1 ml-1 tracking-widest">Observação Técnica</p>
+                                            <p className="text-[8px] font-black uppercase opacity-20 mb-1 ml-1 tracking-widest text-slate-400">Observação Técnica</p>
                                             <p className="text-[10px] text-slate-400 font-medium italic bg-white/5 p-4 rounded-2xl border border-white/5 leading-relaxed">"{h.items[0].notes}"</p>
                                         </div>
                                     )}
@@ -395,7 +391,7 @@ const App = () => {
                             <div className="glass-dark p-10 rounded-[3rem] text-center border border-white/5 shadow-xl hover:bg-white/5 transition-all uppercase leading-none"><p className="text-xl font-black text-blue-500 tracking-tighter">{history[0]?.company || '--'}</p><p className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em] mt-2 leading-none">Unidade Ativa</p></div>
                         </div>
                         {isAdmin && (
-                            <button onClick={exportCSV} className="w-full py-7 bg-blue-600/10 text-blue-500 rounded-[2.5rem] font-black text-[11px] uppercase border border-blue-500/20 flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all mt-4 transition-colors"><FileText size={20} /> Exportar Base Master Completa (Admin CSV)</button>
+                            <button onClick={exportCSV} className="w-full py-7 bg-blue-600/10 text-blue-500 rounded-[2.5rem] font-black text-[11px] uppercase border border-blue-500/20 flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all mt-4 transition-colors transition-all"><FileText size={20} /> Exportar Base Master Completa (Admin CSV)</button>
                         )}
                     </div>
                 )}
@@ -405,15 +401,15 @@ const App = () => {
             <nav className={`fixed bottom-0 left-0 right-0 ${darkMode ? 'glass-dark' : 'glass-light'} border-t border-white/10 p-10 flex justify-around items-center rounded-t-[5.5rem] z-[150] shadow-[0_-30px_90px_rgba(0,0,0,0.8)] backdrop-blur-3xl bg-slate-950/90`}>
                 <button onClick={() => setView('form')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'form' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-40 hover:opacity-100 transition-all'}`}>
                     <ClipboardList size={26} strokeWidth={view === 'form' ? 3 : 2} />
-                    <span className="text-[8px] font-black uppercase tracking-tighter">Lançar</span>
+                    <span className="text-[8px] font-black uppercase tracking-tighter font-black tracking-widest">Lançar</span>
                 </button>
                 <button onClick={() => setView('history')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'history' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-40 hover:opacity-100 transition-all'}`}>
                     <History size={26} strokeWidth={view === 'history' ? 3 : 2} />
-                    <span className="text-[8px] font-black uppercase tracking-tighter">Registos</span>
+                    <span className="text-[8px] font-black uppercase tracking-tighter font-black tracking-widest">Registos</span>
                 </button>
-                <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'dash' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-40'}`}>
+                <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'dash' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-40 hover:opacity-100 transition-all'}`}>
                     <LayoutDashboard size={26} strokeWidth={view === 'dash' ? 3 : 2} />
-                    <span className="text-[8px] font-black uppercase tracking-tighter font-black">Painel</span>
+                    <span className="text-[8px] font-black uppercase tracking-tighter font-black tracking-widest">Painel</span>
                 </button>
             </nav>
         </div>
