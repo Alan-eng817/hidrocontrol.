@@ -1,402 +1,271 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore, collection, addDoc, query, onSnapshot } from "firebase/firestore";
-import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "firebase/auth";
-import { 
-  Camera, Send, CheckCircle2, PlusCircle, ClipboardList, History,
-  LayoutDashboard, FileText, Clock, MapPin, Building2, Trash2,
-  Calendar, Moon, Sun, Database, Activity, ShieldCheck, AlertCircle
-} from 'lucide-react';
-
-/**
- * --- CONFIGURAÇÃO MASTER FIREBASE (ALAN ALVES) ---
- * Esta configuração liga o Vercel diretamente à nuvem do HidroControl Alumar.
- */
-const firebaseConfig = {
-  apiKey: "AIzaSyAPM1NNw9PazMccz5kxZjFAqOYKLqQwLxo",
-  authDomain: "hidrocontrol-alumar.firebaseapp.com",
-  projectId: "hidrocontrol-alumar",
-  storageBucket: "hidrocontrol-alumar.firebasestorage.app",
-  messagingSenderId: "1080945827345",
-  appId: "1:1080945827345:web:bd083793e95f943cb25bb0"
-};
-
-// Inicialização Única
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = "hidrocontrol-alumar"; 
-const ADMIN_EMAIL = "alanlindoso1@gmail.com";
-
-// --- MAPEAMENTO DE ÁREAS E TAGS ---
-const AREA_TAG_MAPPING = {
-    "025A": ["025A-TC-21A", "025A-TC-21B", "025A-TC-21C", "025A-TC-21D", "025A-TC-21E", "025A-TC-21F", "025A-TC-31A", "025A-TC-31B", "025A-TC-31C", "025A-TC-31D", "025A-TC-31E", "025A-TC-31F"],
-    "030I": ["030-TC-001", "030-TC-002", "030-TC-003", "030-TC-004", "030-TC-005", "030-TC-006", "030-TC-007", "030-TC-008", "030-TC-009", "030-TC-010", "030-TC-019", "030-TC-11A", "030-TC-11B", "030-TC-11C", "030-TC-11D", "030-TC-11E", "030-TC-11F", "030-TC-12A", "030-TC-12B", "030-TC-12C", "030-TC-12D", "030-TC-12E", "030-TC-12F", "030-TC-13A", "030-TC-13B", "030-TC-13C", "030-TC-13D", "030-TC-13E", "030-TC-13F", "030-TC-17A", "030-TC-17B", "030-TC-17C", "030-TC-17D", "030-TC-17E", "030-TC-17F", "030-TC-18A", "030-TC-18B", "030-TC-18C", "030-TC-18D", "030-TC-18E", "030-TC-18F"],
-    "030II": ["030-TC-029", "030-TC-21A", "030-TC-21B", "030-TC-22A", "030-TC-22B", "030-TC-22C", "030-TC-22D", "030-TC-23A", "030-TC-23B", "030-TC-23C", "030-TC-23D", "030-TC-24A", "030-TC-24B", "030-TC-24C", "030-TC-24D", "030-TC-25A", "030-TC-25B", "030-TC-25C", "030-TC-25D", "030-TC-26A", "030-TC-26B", "030-TC-26C", "030-TC-26D", "030-TC-26E", "030-TC-26F", "030-TC-31A", "030-TC-31B", "030-TC-32A", "030-TC-32B", "030-TC-32C", "030-TC-32D", "030-TC-33A", "030-TC-33B", "030-TC-33C", "030-TC-33D", "030-TC-34A", "030-TC-34B", "030-TC-34C", "030-TC-34D", "030-TC-35A", "030-TC-35B", "030-TC-35C", "030-TC-35D", "030-TC-36A", "030-TC-36B", "030-TC-36C", "030-TC-36D", "030-TC-36E", "030-TC-36F", "030-TC-41A", "030-TC-41B", "030-TC-42A", "030-TC-42B", "030-TC-42C", "030-TC-42D", "030-TC-43A", "030-TC-43B", "030-TC-43C", "030-TC-43D", "030-TC-44A", "030-TC-44B", "030-TC-44C", "030-TC-44D", "030-TC-45A", "030-TC-45B", "030-TC-45C", "030-TC-45D", "030-TC-46A", "030-TC-46B", "030-TC-46C", "030-TC-46D", "030-TC-46E", "030-TC-46F"],
-    "040I": ["040-TC-011", "040-TC-012", "040-TC-013", "040-TC-014", "040-TC-015", "040K-TC-011"],
-    "040II": ["040-TC-021", "040-TC-022", "040-TC-023", "040-TC-024", "040-TC-025"],
-    "040III": ["040-TC-031", "040-TC-032", "040-TC-033", "040-TC-034", "040-TC-035"],
-    "042I": ["042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015", "042-TC-016", "042-TC-017", "042-TC-018", "042-TC-019"],
-    "042II": ["042-TC-021", "042-TC-022", "042-TC-023", "042-TC-024", "042-TC-025", "042-TC-026", "042-TC-027", "042-TC-028", "042-TC-029"],
-    "042III": ["042-TC-031", "042-TC-032", "042-TC-033", "042-TC-034", "042-TC-035", "042-TC-036", "042-TC-037", "042-TC-038", "042-TC-039"]
-};
-
-const EQUIPAMENTOS_DADOS = {
-    "025A-TC-21A": 33, "025A-TC-21B": 33, "025A-TC-21C": 33, "025A-TC-21D": 33, "025A-TC-21E": 33, "025A-TC-21F": 33,
-    "025A-TC-31A": 33, "025A-TC-31B": 33, "025A-TC-31C": 33, "025A-TC-31D": 33, "025A-TC-31E": 33, "025A-TC-31F": 33, "030-TC-001": 600, "030-TC-002": 880, "030-TC-003": 880, "030-TC-004": 880, "030-TC-005": 880, "030-TC-006": 880, "030-TC-007": 880, "030-TC-008": 880, "030-TC-009": 1000, "030-TC-010": 1000, "030-TC-019": 600, "030-TC-029": 600, "030-TC-11A": 180, "030-TC-11B": 180, "030-TC-11C": 180, "030-TC-11D": 180, "030-TC-11E": 180, "030-TC-11F": 180, "030-TC-12A": 180, "030-TC-12B": 180, "030-TC-12C": 180, "030-TC-12D": 180, "030-TC-12E": 180, "030-TC-12F": 180, "030-TC-13A": 180, "030-TC-13B": 180, "030-TC-13C": 180, "030-TC-13D": 180, "030-TC-13E": 180, "030-TC-13F": 180, "030-TC-17A": 33, "030-TC-17B": 33, "030-TC-17C": 33, "030-TC-17D": 33, "030-TC-17E": 33, "030-TC-17F": 33, "030-TC-18A": 33, "030-TC-18B": 33, "030-TC-18C": 33, "030-TC-18D": 33, "030-TC-18E": 33, "030-TC-18F": 33, "030-TC-21A": 180, "030-TC-21B": 180, "030-TC-22A": 180, "030-TC-22B": 180, "030-TC-22C": 180, "030-TC-22D": 180, "030-TC-23A": 180, "030-TC-23B": 180, "030-TC-23C": 180, "030-TC-23D": 180, "030-TC-24A": 180, "030-TC-24B": 180, "030-TC-24C": 180, "030-TC-24D": 180, "030-TC-25A": 180, "030-TC-25B": 180, "030-TC-25C": 180, "030-TC-25D": 180, "030-TC-26A": 180, "030-TC-26B": 180, "030-TC-26C": 180, "030-TC-26D": 180, "030-TC-26E": 180, "030-TC-26F": 180, "030-TC-31A": 180, "030-TC-31B": 180, "030-TC-32A": 180, "030-TC-32B": 180, "030-TC-32C": 180, "030-TC-32D": 180, "030-TC-33A": 180, "030-TC-33B": 180, "030-TC-33C": 180, "030-TC-33D": 180, "030-TC-34A": 180, "030-TC-34B": 180, "030-TC-34C": 180, "030-TC-34D": 180, "030-TC-35A": 180, "030-TC-35B": 180, "030-TC-35C": 180, "030-TC-35D": 180, "030-TC-36A": 180, "030-TC-36B": 180, "030-TC-36C": 180, "030-TC-36D": 180, "030-TC-36E": 180, "030-TC-36F": 180, "030-TC-41A": 180, "030-TC-41B": 180, "030-TC-42A": 180, "030-TC-42B": 180, "030-TC-42C": 180, "030-TC-42D": 180, "030-TC-43A": 180, "030-TC-43B": 180, "030-TC-43C": 180, "030-TC-43D": 180, "030-TC-44A": 180, "030-TC-44B": 180, "030-TC-44C": 180, "030-TC-44D": 180, "030-TC-45A": 180, "030-TC-45B": 180, "030-TC-45C": 180, "030-TC-45D": 180, "030-TC-46A": 180, "030-TC-46B": 180, "030-TC-46C": 180, "030-TC-46D": 180, "030-TC-46E": 180, "030-TC-46F": 180, "040-TC-011": 1000, "040-TC-012": 1000, "040-TC-013": 1000, "040-TC-014": 1000, "040-TC-015": 1000, "040-TC-021": 1000, "040-TC-022": 1000, "040-TC-023": 1000, "040-TC-024": 1000, "040-TC-025": 1000, "040-TC-031": 1000, "040-TC-032": 1000, "040-TC-033": 1000, "040-TC-034": 1000, "040-TC-035": 1000, "040K-TC-011": 1000, "042-TC-011": 1000, "042-TC-012": 1000, "042-TC-013": 1000, "042-TC-014": 1000, "042-TC-015": 1000, "042-TC-016": 1000, "042-TC-017": 1000, "042-TC-018": 1000, "042-TC-019": 1000, "042-TC-021": 1000, "042-TC-022": 1000, "042-TC-023": 1000, "042-TC-024": 1000, "042-TC-025": 1000, "042-TC-026": 1000, "042-TC-027": 1000, "042-TC-028": 1000, "042-TC-029": 1000, "042-TC-031": 1000, "042-TC-032": 1000, "042-TC-033": 1000, "042-TC-034": 1000, "042-TC-035": 1000, "042-TC-036": 1000, "042-TC-037": 1000, "042-TC-038": 1000, "042-TC-039": 1000
-};
-
-const AREAS_OPERACIONAIS = Object.keys(AREA_TAG_MAPPING);
-const EQUIPAMENTOS_ALL = Object.keys(EQUIPAMENTOS_DADOS);
-
-const App = () => {
-    const [user, setUser] = useState(null);
-    const [view, setView] = useState('form'); 
-    const [history, setHistory] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [darkMode, setDarkMode] = useState(true);
-    const [historyFilter, setHistoryFilter] = useState('0'); // 0=Hoje, custom=Datas
-    const [dateRange, setDateRange] = useState({ start: '', end: '' });
+<!DOCTYPE html>
+<html lang="pt-PT" class="notranslate">
+<head>
+    <meta charset="UTF-8">
+    <meta name="google" content="notranslate">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HidroControl Pro - Alumar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    // Estados do Formulário
-    const [company, setCompany] = useState('MONTISOL');
-    const [turno, setTurno] = useState('ADM');
-    const [area, setArea] = useState('');
-    const [areaSearch, setAreaSearch] = useState('');
-    const [showAreaList, setShowAreaList] = useState(false);
-    const [horarios, setHorarios] = useState({ chegada: '', inicio: '' });
-    const [items, setItems] = useState([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }]);
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-    const containerRef = useRef(null);
+        window.FB_CORE = { initializeApp, getFirestore, collection, addDoc, query, onSnapshot, getAuth, signInAnonymously, onAuthStateChanged, signOut };
+    </script>
 
-    // --- AUTENTICAÇÃO MESTRA (RULE 3) ---
-    useEffect(() => {
-        const initAuth = async () => {
-            try {
-                // Login anónimo é o padrão agora que Alan ativou no Firebase Console
-                await signInAnonymously(auth);
-            } catch (error) {
-                console.error("Auth Erro:", error.code);
-            }
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .glass-dark { background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(20px); }
+        .glass-light { background: rgba(255, 255, 255, 0.9); border: 1px solid rgba(0, 0, 0, 0.05); backdrop-filter: blur(20px); }
+        .animate-pop { animation: fadeIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .dropdown-scroll::-webkit-scrollbar { width: 4px; }
+        .dropdown-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body class="bg-slate-950 overflow-x-hidden hide-scroll">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAPM1NNw9PazMccz5kxZjFAqOYKLqQwLxo",
+            authDomain: "hidrocontrol-alumar.firebaseapp.com",
+            projectId: "hidrocontrol-alumar",
+            storageBucket: "hidrocontrol-alumar.firebasestorage.app",
+            messagingSenderId: "1080945827345",
+            appId: "1:1080945827345:web:bd083793e95f943cb25bb0"
         };
-        initAuth();
-        const unsub = onAuthStateChanged(auth, (u) => { if(u) setUser(u); });
-        return () => unsub();
-    }, []);
 
-    // --- CARREGAMENTO DE DADOS (RULE 1) ---
-    useEffect(() => {
-        if (!user) return;
-        const q = collection(db, 'artifacts', appId, 'public', 'data', 'registos');
-        const unsub = onSnapshot(q, (snap) => {
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setHistory(data.sort((a,b) => b.ts - a.ts));
-        }, (err) => console.error("Firestore Erro:", err));
-        return () => unsub();
-    }, [user]);
-
-    // Lógica para fechar dropdowns ao clicar fora
-    useEffect(() => {
-        const handleOutside = (e) => {
-            if (containerRef.current && !e.target.closest('.dropdown-container')) {
-                setItems(prev => prev.map(it => ({ ...it, showList: false })));
-                setShowAreaList(false);
-            }
+        const AREA_TAG_MAPPING = {
+            "025A": ["025A-TC-21A", "025A-TC-21B", "025A-TC-21C", "025A-TC-21D", "025A-TC-21E", "025A-TC-21F", "025A-TC-31A", "025A-TC-31B", "025A-TC-31C", "025A-TC-31D", "025A-TC-31E", "025A-TC-31F"],
+            "030I": ["030-TC-001", "030-TC-002", "030-TC-003", "030-TC-004", "030-TC-005", "030-TC-006", "030-TC-007", "030-TC-008", "030-TC-009", "030-TC-010", "030-TC-019", "030-TC-11A", "030-TC-11B", "030-TC-11C", "030-TC-11D", "030-TC-11E", "030-TC-11F", "030-TC-12A", "030-TC-12B", "030-TC-12C", "030-TC-12D", "030-TC-12E", "030-TC-12F", "030-TC-13A", "030-TC-13B", "030-TC-13C", "030-TC-13D", "030-TC-13E", "030-TC-13F", "030-TC-17A", "030-TC-17B", "030-TC-17C", "030-TC-17D", "030-TC-17E", "030-TC-17F", "030-TC-18A", "030-TC-18B", "030-TC-18C", "030-TC-18D", "030-TC-18E", "030-TC-18F"],
+            "030II": ["030-TC-029", "030-TC-21A", "030-TC-21B", "030-TC-22A", "030-TC-22B", "030-TC-22C", "030-TC-22D", "030-TC-23A", "030-TC-23B", "030-TC-23C", "030-TC-23D", "030-TC-24A", "030-TC-24B", "030-TC-24C", "030-TC-24D", "030-TC-25A", "030-TC-25B", "030-TC-25C", "030-TC-25D", "030-TC-26A", "030-TC-26B", "030-TC-26C", "030-TC-26D", "030-TC-26E", "030-TC-26F", "030-TC-31A", "030-TC-31B", "030-TC-32A", "030-TC-32B", "030-TC-32C", "030-TC-32D", "030-TC-33A", "030-TC-33B", "030-TC-33C", "030-TC-33D", "030-TC-34A", "030-TC-34B", "030-TC-34C", "030-TC-34D", "030-TC-35A", "030-TC-35B", "030-TC-35C", "030-TC-35D", "030-TC-36A", "030-TC-36B", "030-TC-36C", "030-TC-36D", "030-TC-36E", "030-TC-36F", "030-TC-41A", "030-TC-41B", "030-TC-42A", "030-TC-42B", "030-TC-42C", "030-TC-42D", "030-TC-43A", "030-TC-43B", "030-TC-43C", "030-TC-43D", "030-TC-44A", "030-TC-44B", "030-TC-44C", "030-TC-44D", "030-TC-45A", "030-TC-45B", "030-TC-45C", "030-TC-45D", "030-TC-46A", "030-TC-46B", "030-TC-46C", "030-TC-46D", "030-TC-46E", "030-TC-46F"],
+            "040I": ["040-TC-011", "040-TC-012", "040-TC-013", "040-TC-014", "040-TC-015", "040K-TC-011"],
+            "040II": ["040-TC-021", "040-TC-022", "040-TC-023", "040-TC-024", "040-TC-025"],
+            "040III": ["040-TC-031", "040-TC-032", "040-TC-033", "040-TC-034", "040-TC-035"],
+            "042I": ["042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015", "042-TC-016", "042-TC-017", "042-TC-018", "042-TC-019"],
+            "042II": ["042-TC-021", "042-TC-022", "042-TC-023", "042-TC-024", "042-TC-025", "042-TC-026", "042-TC-027", "042-TC-028", "042-TC-029"],
+            "042III": ["042-TC-031", "042-TC-032", "042-TC-033", "042-TC-034", "042-TC-035", "042-TC-036", "042-TC-037", "042-TC-038", "042-TC-039"]
         };
-        document.addEventListener('mousedown', handleOutside);
-        return () => document.removeEventListener('mousedown', handleOutside);
-    }, []);
 
-    // --- FILTRAGEM (RULE 2) ---
-    const filteredHistory = useMemo(() => {
-        const todayStr = new Date().toLocaleDateString('pt-BR');
-        const now = Date.now();
-        return history.filter(h => {
-            if (historyFilter === 'custom' && dateRange.start && dateRange.end) {
-                const hDate = new Date(h.ts);
-                const sDate = new Date(dateRange.start + 'T00:00:00');
-                const eDate = new Date(dateRange.end + 'T23:59:59');
-                return hDate >= sDate && hDate <= eDate;
-            }
-            if (historyFilter === '0') return h.data === todayStr;
-            const daysInMs = parseInt(historyFilter) * 24 * 60 * 60 * 1000;
-            return (now - h.ts) <= daysInMs;
-        });
-    }, [history, historyFilter, dateRange]);
+        const EQUIPAMENTOS_DADOS = {
+            "025A-TC-21A": 33, "025A-TC-21B": 33, "025A-TC-21C": 33, "025A-TC-21D": 33, "025A-TC-21E": 33, "025A-TC-21F": 33,
+            "025A-TC-31A": 33, "025A-TC-31B": 33, "025A-TC-31C": 33, "025A-TC-31D": 33, "025A-TC-31E": 33, "025A-TC-31F": 33, "030-TC-001": 600, "030-TC-002": 880, "030-TC-003": 880, "030-TC-004": 880, "030-TC-005": 880, "030-TC-006": 880, "030-TC-007": 880, "030-TC-008": 880, "030-TC-009": 1000, "030-TC-010": 1000, "030-TC-019": 600, "030-TC-029": 600, "030-TC-11A": 180, "030-TC-11B": 180, "030-TC-11C": 180, "030-TC-11D": 180, "030-TC-11E": 180, "030-TC-11F": 180, "030-TC-12A": 180, "030-TC-12B": 180, "030-TC-12C": 180, "030-TC-12D": 180, "030-TC-12E": 180, "030-TC-12F": 180, "030-TC-13A": 180, "030-TC-13B": 180, "030-TC-13C": 180, "030-TC-13D": 180, "030-TC-13E": 180, "030-TC-13F": 180, "030-TC-17A": 33, "030-TC-17B": 33, "030-TC-17C": 33, "030-TC-17D": 33, "030-TC-17E": 33, "030-TC-17F": 33, "030-TC-18A": 33, "030-TC-18B": 33, "030-TC-18C": 33, "030-TC-18D": 33, "030-TC-18E": 33, "030-TC-18F": 33, "030-TC-21A": 180, "030-TC-21B": 180, "030-TC-22A": 180, "030-TC-22B": 180, "030-TC-22C": 180, "030-TC-22D": 180, "030-TC-23A": 180, "030-TC-23B": 180, "030-TC-23C": 180, "030-TC-23D": 180, "030-TC-24A": 180, "030-TC-24B": 180, "030-TC-24C": 180, "030-TC-24D": 180, "030-TC-25A": 180, "030-TC-25B": 180, "030-TC-25C": 180, "030-TC-25D": 180, "030-TC-26A": 180, "030-TC-26B": 180, "030-TC-26C": 180, "030-TC-26D": 180, "030-TC-26E": 180, "030-TC-26F": 180, "030-TC-31A": 180, "030-TC-31B": 180, "030-TC-32A": 180, "030-TC-32B": 180, "030-TC-32C": 180, "030-TC-32D": 180, "030-TC-33A": 180, "030-TC-33B": 180, "030-TC-33C": 180, "030-TC-33D": 180, "030-TC-34A": 180, "030-TC-34B": 180, "030-TC-34C": 180, "030-TC-34D": 180, "030-TC-35A": 180, "030-TC-35B": 180, "030-TC-35C": 180, "030-TC-35D": 180, "030-TC-36A": 180, "030-TC-36B": 180, "030-TC-36C": 180, "030-TC-36D": 180, "030-TC-36E": 180, "030-TC-36F": 180, "030-TC-41A": 180, "030-TC-41B": 180, "030-TC-42A": 180, "030-TC-42B": 180, "030-TC-42C": 180, "030-TC-42D": 180, "030-TC-43A": 180, "030-TC-43B": 180, "030-TC-43C": 180, "030-TC-43D": 180, "030-TC-44A": 180, "030-TC-44B": 180, "030-TC-44C": 180, "030-TC-44D": 180, "030-TC-45A": 180, "030-TC-45B": 180, "030-TC-45C": 180, "030-TC-45D": 180, "030-TC-46A": 180, "030-TC-46B": 180, "030-TC-46C": 180, "030-TC-46D": 180, "030-TC-46E": 180, "030-TC-46F": 180, "040-TC-011": 1000, "040-TC-012": 1000, "040-TC-013": 1000, "040-TC-014": 1000, "040-TC-015": 1000, "040-TC-021": 1000, "040-TC-022": 1000, "040-TC-023": 1000, "040-TC-024": 1000, "040-TC-025": 1000, "040-TC-031": 1000, "040-TC-032": 1000, "040-TC-033": 1000, "040-TC-034": 1000, "040-TC-035": 1000, "040K-TC-011": 1000, "042-TC-011": 1000, "042-TC-012": 1000, "042-TC-013": 1000, "042-TC-014": 1000, "042-TC-015": 1000, "042-TC-016": 1000, "042-TC-017": 1000, "042-TC-018": 1000, "042-TC-019": 1000, "042-TC-021": 1000, "042-TC-022": 1000, "042-TC-023": 1000, "042-TC-024": 1000, "042-TC-025": 1000, "042-TC-026": 1000, "042-TC-027": 1000, "042-TC-028": 1000, "042-TC-029": 1000, "042-TC-031": 1000, "042-TC-032": 1000, "042-TC-033": 1000, "042-TC-034": 1000, "042-TC-035": 1000, "042-TC-036": 1000, "042-TC-037": 1000, "042-TC-038": 1000, "042-TC-039": 1000
+};
 
-    const statsToday = useMemo(() => {
-        const todayStr = new Date().toLocaleDateString('pt-BR');
-        const todayData = history.filter(h => h.data === todayStr);
-        const totalL = todayData.reduce((acc, r) => acc + (r.items || []).reduce((a,i) => a + Number(i.limpos || 0), 0), 0);
-        const totalG = todayData.reduce((acc, r) => acc + (r.items || []).reduce((a,i) => a + Number(i.totalTag || 0), 0), 1);
-        return { totalL, efficiency: ((totalL / (totalG || 1)) * 100).toFixed(1) };
-    }, [history]);
+        const AREAS_LISTA = Object.keys(AREA_TAG_MAPPING);
 
-    const updateItem = (idx, field, val) => {
-        const newItems = [...items];
-        newItems[idx][field] = val;
-        if (field === 'tag' && EQUIPAMENTOS_DADOS[val]) {
-            newItems[idx].totalTag = String(EQUIPAMENTOS_DADOS[val]);
-        }
-        setItems(newItems);
-    };
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('form'); 
+            const [history, setHistory] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [darkMode, setDarkMode] = useState(true);
+            const [company, setCompany] = useState('MONTISOL');
+            const [turno, setTurno] = useState('ADM');
+            const [area, setArea] = useState('');
+            const [areaSearch, setAreaSearch] = useState('');
+            const [showAreaList, setShowAreaList] = useState(false);
+            const [items, setItems] = useState([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '' }]);
 
-    const handleSend = async () => {
-        if (!user || items.some(i => !i.tag)) return;
-        setLoading(true);
-        try {
-            const docData = {
-                data: new Date().toLocaleDateString('pt-BR'),
-                hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                ts: Date.now(),
-                company, turno, area, horarios,
-                user: user.email || "Operador Alumar",
-                items: items.map(i => ({ tag: i.tag, limpos: i.limpos, ferro: i.ferro || 0, totalTag: i.totalTag, notes: i.notes }))
+            // --- INICIALIZAÇÃO FIREBASE ---
+            useEffect(() => {
+                const init = async () => {
+                    const fb = window.FB_CORE;
+                    if (!fb) return;
+                    const app = fb.initializeApp(firebaseConfig);
+                    const auth = fb.getAuth(app);
+                    const db = fb.getFirestore(app);
+                    
+                    fb.onAuthStateChanged(auth, (u) => {
+                        if (u) {
+                            setUser(u);
+                            // Ouvinte de dados
+                            fb.onSnapshot(fb.collection(db, 'artifacts', 'hidrocontrol-alumar', 'public', 'data', 'registos'), (snap) => {
+                                const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                                setHistory(data.sort((a,b) => b.ts - a.ts));
+                            });
+                        } else {
+                            fb.signInAnonymously(auth).catch(e => console.error("Auth Fail", e));
+                        }
+                    });
+                };
+                init();
+            }, []);
+
+            const statsToday = useMemo(() => {
+                const todayStr = new Date().toLocaleDateString('pt-BR');
+                const todayData = history.filter(h => h.data === todayStr);
+                const l = todayData.reduce((acc, r) => acc + (r.items || []).reduce((a,i) => a + Number(i.limpos || 0), 0), 0);
+                const t = todayData.reduce((acc, r) => acc + (r.items || []).reduce((a,i) => a + Number(i.totalTag || 0), 0), 1);
+                return { l, eff: ((l / (t || 1)) * 100).toFixed(1) };
+            }, [history]);
+
+            const updateItem = (idx, field, val) => {
+                const newItems = [...items];
+                newItems[idx][field] = val;
+                if (field === 'tag' && EQUIPAMENTOS_DADOS[val]) {
+                    newItems[idx].totalTag = String(EQUIPAMENTOS_DADOS[val]);
+                }
+                setItems(newItems);
             };
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'registos'), docData);
-            setView('success');
-        } catch (e) { console.error("Gravação Fail:", e); }
-        setLoading(false);
-    };
 
-    const getWhatsAppLink = (reg) => {
-        let msg = `*HIDROJATO - ${reg.company}*%0A📍 *Área:* ${reg.area}%0A📌 *Turno:* ${reg.turno}%0A📅 *Data:* ${reg.data}%0A%0A*Logística:*%0A➡️ Chegada: ${reg.horarios?.chegada || '--'}%0A➡️ Início: ${reg.horarios?.inicio || '--'}%0A%0A`;
-        (reg.items || []).forEach(i => {
-            msg += `🛠️ *TAG:* ${i.tag}%0A✅ Limpos: ${i.limpos}%0A⚠️ Ferro: ${i.ferro || 0}%0A📊 Progresso: ${i.limpos}/${i.totalTag}%0A${i.notes ? `📝 Obs: ${i.notes}%0A` : ''}---%0A`;
-        });
-        return `https://wa.me/?text=${msg}`;
-    };
+            const handleSend = async () => {
+                if (!user || items.some(i => !i.tag)) return;
+                setLoading(true);
+                try {
+                    const fb = window.FB_CORE;
+                    const db = fb.getFirestore();
+                    const docData = {
+                        data: new Date().toLocaleDateString('pt-BR'),
+                        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                        ts: Date.now(),
+                        company, turno, area,
+                        user: user.uid,
+                        items: items.map(i => ({ tag: i.tag, limpos: i.limpos, ferro: i.ferro || 0, totalTag: i.totalTag, notes: i.notes }))
+                    };
+                    await fb.addDoc(fb.collection(db, 'artifacts', 'hidrocontrol-alumar', 'public', 'data', 'registos'), docData);
+                    setView('success');
+                } catch (e) { console.error("Erro Save", e); }
+                setLoading(false);
+            };
 
-    const exportCSV = () => {
-        let csv = 'Data,Hora,Turno,Empresa,Area,TAG,Limpos,Com Ferro,Total,Observacoes,Operador\n';
-        history.forEach(h => {
-            (h.items || []).forEach(i => {
-                csv += `${h.data},${h.hora},${h.turno},${h.company},${h.area},${i.tag},${i.limpos},${i.ferro || 0},${i.totalTag},"${(i.notes || "").replace(/"/g, '""')}",${h.user}\n`;
-            });
-        });
-        const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
-        link.download = `HidroControl_Base_Master.csv`; link.click();
-    };
-
-    const isAdmin = user?.email === ADMIN_EMAIL || user?.isAnonymous;
-
-    if (!user) return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 text-white">
-            <div className="glass-dark w-full max-w-sm p-12 rounded-[4rem] text-center space-y-6 shadow-2xl border border-white/5">
-                <h1 className="font-black text-4xl italic tracking-tighter uppercase leading-none text-blue-500">Hidro<span className="text-white">Control</span></h1>
-                <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="text-[10px] opacity-40 uppercase tracking-[0.3em] font-black">Sincronizando Nuvem Alumar...</p>
-            </div>
-        </div>
-    );
-
-    return (
-        <div ref={containerRef} className={`min-h-screen flex flex-col max-w-lg mx-auto ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
-            
-            {/* TELA DE SUCESSO FIXA */}
-            {view === 'success' && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-pop">
-                    <div className="glass-dark w-full max-w-sm p-12 rounded-[4rem] text-center space-y-8 border border-white/10 shadow-2xl">
-                        <div className="space-y-4">
-                            <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border-2 border-green-500/20 text-green-500">
-                                <CheckCircle2 size={40} />
-                            </div>
-                            <div className="space-y-2 text-center">
-                                <h2 className="text-2xl font-black uppercase italic leading-none text-white tracking-tighter">SINCRONIZADO!</h2>
-                                <p className="text-sm opacity-50 text-slate-300 font-bold uppercase text-[9px] tracking-widest">Nuvem Alumar Ativa</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <button onClick={() => window.open(getWhatsAppLink(history[0]), '_blank')} className="w-full bg-green-600 py-6 rounded-3xl font-black uppercase text-xs flex items-center justify-center gap-3 active:scale-95 shadow-lg shadow-green-600/20"><Send size={18} /> Enviar WhatsApp</button>
-                            <button onClick={() => { setView('form'); setArea(''); setAreaSearch(''); setItems([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }]); }} className={`w-full py-5 rounded-3xl font-black uppercase text-[10px] border border-white/10 text-white tracking-widest active:scale-95`}>Confirmar e Concluir</button>
-                        </div>
+            if (!user) return (
+                <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+                    <div className="text-center space-y-4">
+                        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                        <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Iniciando Alumar Cloud...</p>
                     </div>
                 </div>
-            )}
+            );
 
-            <header className="p-6 flex justify-between items-center sticky top-0 z-50 backdrop-blur-2xl border-b border-white/5 bg-slate-950/80">
-                <div className="flex flex-col text-left">
-                    <h1 className="font-black text-2xl italic uppercase tracking-tighter leading-none text-blue-500">Hidro<span className={darkMode ? 'text-white' : 'text-slate-900'}>Control</span></h1>
-                    <span className="text-[9px] font-bold opacity-30 uppercase tracking-widest mt-1 tracking-widest leading-none flex items-center gap-1">ALUMAR <span className="px-1.5 py-0.5 bg-blue-600/20 text-blue-500 rounded font-black text-[7px]">PREMIUM</span></span>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setDarkMode(!darkMode)} className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${darkMode ? 'border-white/10' : 'border-slate-300'}`}>{darkMode ? '☀️' : '🌙'}</button>
-                    <button onClick={() => signOut(auth)} className="bg-red-500/10 text-red-500 text-[9px] font-black uppercase px-4 py-2 rounded-xl border border-red-500/20 active:scale-90 transition-all">Sair</button>
-                </div>
-            </header>
-
-            <main className="p-6 pb-48 space-y-6 overflow-y-auto hide-scroll text-slate-800 dark:text-slate-200">
-                {view === 'form' && (
-                    <div className="space-y-6 animate-pop">
-                        <div className="grid grid-cols-2 gap-2">
-                            {['MONTISOL', 'CONSTEC'].map(c => (
-                                <button key={c} onClick={() => setCompany(c)} className={`py-5 rounded-2xl font-black text-xs border transition-all ${company === c ? 'bg-blue-600 border-blue-400 text-white shadow-lg scale-[1.02]' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}>{c}</button>
-                            ))}
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                            {['ADM', 'T.C', 'T.A'].map(t => (
-                                <button key={t} onClick={() => setTurno(t)} className={`py-4 rounded-2xl font-black text-xs border transition-all ${turno === t ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}>{t}</button>
-                            ))}
-                        </div>
-
-                        <section className="glass-dark p-8 rounded-[2.5rem] shadow-xl border border-white/5 relative dropdown-container text-left">
-                            <div className="space-y-2 relative">
-                                <label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500 tracking-widest block leading-none mb-1">Área Operacional</label>
-                                <div className="relative">
-                                    <MapPin size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
-                                    <input type="text" placeholder="BUSCAR ÁREA..." value={areaSearch} onFocus={() => setShowAreaList(true)} onChange={(e) => { const v = e.target.value.toUpperCase(); setAreaSearch(v); setArea(v); }} className="w-full pl-12 pr-5 py-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400 placeholder-slate-800" />
+            return (
+                <div className={`min-h-screen flex flex-col max-w-lg mx-auto ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+                    
+                    {view === 'success' && (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl">
+                            <div className="glass-dark w-full max-w-sm p-12 rounded-[4rem] text-center space-y-8 animate-pop border border-white/10 shadow-2xl">
+                                <div className="space-y-4">
+                                    <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border-2 border-green-500/20 text-green-500">
+                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                                    </div>
+                                    <h2 className="text-2xl font-black uppercase italic leading-none tracking-tighter">Sincronizado!</h2>
                                 </div>
-                                {showAreaList && (
-                                    <div className="absolute z-[120] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-2xl border border-blue-500/40 overflow-hidden">
-                                        <div className="max-h-48 overflow-y-auto dropdown-scroll uppercase text-slate-300">
-                                            {AREAS_OPERACIONAIS.filter(a => a.includes(areaSearch)).map(a => (
-                                                <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-black border-b border-white/5 cursor-pointer flex justify-between transition-all transition-colors uppercase"><span>{a}</span><span className="text-[7px] opacity-30 font-black">SELECIONAR</span></div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                <button onClick={() => { setView('form'); setArea(''); setAreaSearch(''); setItems([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '' }]); }} className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs active:scale-95 transition-all">Confirmar e Continuar</button>
                             </div>
-                            <div className="grid grid-cols-2 gap-4 mt-4">
-                                <div className="space-y-1"><label className="text-[8px] font-bold uppercase opacity-30 ml-2 tracking-widest text-xs">Chegada</label><input type="time" value={horarios.chegada} onChange={e => setHorarios({...horarios, chegada: e.target.value})} className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-black text-center text-white outline-none focus:border-blue-500" /></div>
-                                <div className="space-y-1"><label className="text-[8px] font-bold uppercase opacity-30 ml-2 tracking-widest text-xs">Início</label><input type="time" value={horarios.inicio} onChange={e => setHorarios({...horarios, inicio: e.target.value})} className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-black text-center text-white outline-none focus:border-blue-500" /></div>
-                            </div>
-                        </section>
+                        </div>
+                    )}
 
-                        {items.map((it, idx) => (
-                            <section key={idx} className="glass-dark p-8 rounded-[3.5rem] space-y-6 relative border-l-[12px] border-blue-600 shadow-2xl border border-white/5 dropdown-container text-left">
-                                {idx > 0 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} className="absolute top-6 right-6 text-red-500/40 hover:text-red-500 transition-all"><Trash2 size={18} /></button>}
-                                <div className="space-y-2 relative">
-                                    <label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500 tracking-widest block leading-none mb-1">Equipamento (TAG)</label>
-                                    <div className="relative">
-                                        <Building2 size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
-                                        <input type="text" placeholder="SELECIONE O TAG..." value={it.search} onFocus={() => updateItem(idx, 'showList', true)} onChange={(e) => { const v = e.target.value.toUpperCase(); updateItem(idx, 'search', v); updateItem(idx, 'tag', v); }} className="w-full pl-12 pr-5 py-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400 placeholder-slate-800" />
-                                    </div>
-                                    {it.showList && (
-                                        <div className="absolute z-[110] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-2xl border border-blue-500/30 overflow-hidden text-slate-300 uppercase">
-                                            <div className="max-h-60 overflow-y-auto dropdown-scroll">
-                                                {(AREA_TAG_MAPPING[area] || EQUIPAMENTOS_ALL).filter(t => t.includes(it.search)).map(tag => (
-                                                    <div key={tag} onClick={() => { updateItem(idx, 'tag', tag); updateItem(idx, 'search', tag); updateItem(idx, 'showList', false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-bold border-b border-white/5 cursor-pointer flex justify-between transition-colors transition-all"><span>{tag}</span><span className="text-[7px] opacity-20 font-black tracking-widest">SELECIONAR</span></div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
+                    <header className="p-6 flex justify-between items-center sticky top-0 z-50 backdrop-blur-3xl border-b border-white/5 bg-slate-950/80">
+                        <div className="flex flex-col">
+                            <h1 className="font-black text-2xl italic uppercase tracking-tighter leading-none text-blue-500">Hidro<span className={darkMode ? 'text-white' : 'text-slate-900'}>Control</span></h1>
+                            <span className="text-[9px] font-bold opacity-30 uppercase tracking-widest mt-1">Intelligence v2.0</span>
+                        </div>
+                        <button onClick={() => setDarkMode(!darkMode)} className="w-10 h-10 rounded-full flex items-center justify-center border border-white/10">{darkMode ? '☀️' : '🌙'}</button>
+                    </header>
+
+                    <main className="p-6 pb-48 space-y-6 overflow-y-auto hide-scroll text-slate-800 dark:text-slate-200">
+                        {view === 'form' ? (
+                            <div className="space-y-6 animate-pop">
+                                <div className="grid grid-cols-2 gap-2">
+                                    {['MONTISOL', 'CONSTEC'].map(c => (
+                                        <button key={c} onClick={() => setCompany(c)} className={`py-5 rounded-2xl font-black text-xs border transition-all ${company === c ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}>{c}</button>
+                                    ))}
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
-                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-green-500 text-center block tracking-tighter leading-none mb-1">Limpos</label><input type="number" value={it.limpos} onChange={e => updateItem(idx, 'limpos', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-white border border-slate-900 shadow-inner outline-none placeholder-slate-900" placeholder="0" /></div>
-                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-red-500 text-center block tracking-tighter leading-none mb-1 italic">C. Ferro</label><input type="number" value={it.ferro} onChange={e => updateItem(idx, 'ferro', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-red-500 border border-red-900/30 shadow-inner outline-none placeholder-red-950" placeholder="0" /></div>
-                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase opacity-40 text-center block tracking-tighter leading-none mb-1">Total</label><input type="number" value={it.totalTag} onChange={e => updateItem(idx, 'totalTag', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-slate-500 border border-slate-900 outline-none" /></div>
+                                    {['ADM', 'T.C', 'T.A'].map(t => (
+                                        <button key={t} onClick={() => setTurno(t)} className={`py-4 rounded-2xl font-black text-xs border transition-all ${turno === t ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}>{t}</button>
+                                    ))}
                                 </div>
-                                <div className="space-y-1"><label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500 tracking-widest block leading-none mb-1">Notas de Atividade</label><textarea placeholder="Relate detalhes, pendências ou impactos..." value={it.notes} onChange={e => updateItem(idx, 'notes', e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 outline-none font-bold text-xs h-28 resize-none text-slate-300"></textarea></div>
-                            </section>
-                        ))}
-                        <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }])} className="w-full py-6 border-2 border-dashed border-blue-500/40 rounded-3xl text-blue-500 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 transition-colors transition-all">+ Adicionar TAG</button>
-                        <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] transition-all active:scale-95 flex items-center justify-center gap-3 transition-colors">{loading ? 'SINCRONIZANDO...' : <><Send size={20} /> Salvar Relatório Profissional</>}</button>
-                    </div>
-                )}
 
-                {view === 'history' && (
-                    <div className="space-y-6 animate-pop pb-12">
-                        <div className="glass-dark p-6 rounded-[2.5rem] border border-white/5 space-y-4 shadow-xl">
-                            <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2 hide-scroll no-scrollbar">
-                                {[{l: 'Hoje', v: '0'}, {l: '3 Dias', v: '3'}, {l: '7 Dias', v: '7'}, {l: '15 Dias', v: '15'}, {l: 'Personalizado', v: 'custom'}].map(f => (
-                                    <button key={f.v} onClick={() => setHistoryFilter(f.v)} className={`px-5 py-2.5 rounded-full text-[10px] font-black uppercase whitespace-nowrap transition-all ${historyFilter === f.v ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-white/5 text-slate-500 border border-white/5'}`}>{f.l}</button>
-                                ))}
-                            </div>
-                            {historyFilter === 'custom' && (
-                                <div className="grid grid-cols-2 gap-3 animate-pop pt-2">
-                                    <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase text-slate-500 ml-2 tracking-widest text-left block">Início</label>
-                                        <input type="date" value={dateRange.start} onChange={(e) => setDateRange({...dateRange, start: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-white/5 text-xs font-bold text-blue-400 outline-none" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase text-slate-500 ml-2 tracking-widest text-left block">Fim</label>
-                                        <input type="date" value={dateRange.end} onChange={(e) => setDateRange({...dateRange, end: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-white/5 text-xs font-bold text-blue-400 outline-none" />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="space-y-4">
-                            {filteredHistory.map(h => (
-                                <div key={h.id} className="glass-dark p-8 rounded-[3.5rem] border border-white/5 shadow-2xl relative overflow-hidden group text-left">
-                                    <div className="flex justify-between items-start text-slate-300">
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">{h.company}</p>
-                                            <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none">{h.items?.[0]?.tag}</h4>
-                                            <p className="text-[9px] font-bold opacity-30 uppercase flex items-center gap-2"><Calendar size={10} /> {h.data} • <Clock size={10} /> {h.hora} • {h.turno}</p>
-                                        </div>
-                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className="w-12 h-12 bg-green-500/20 text-green-500 rounded-2xl flex items-center justify-center border border-green-500/20 active:scale-90 transition-all shadow-lg"><Send size={18} className="text-green-500" /></button>
-                                    </div>
-                                    <div className="bg-slate-950/50 p-6 rounded-[2rem] border border-white/5 space-y-4 mt-4 text-slate-300 text-center">
-                                        {(h.items || []).map((it, idx) => (
-                                            <div key={idx} className="flex justify-between items-center border-b border-white/5 last:border-none pb-4 last:pb-0">
-                                                <div className="space-y-1 text-left">
-                                                    <p className="text-[11px] font-black uppercase text-blue-400">{it.tag}</p>
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-20 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-blue-600 rounded-full" style={{ width: `${(Number(it.limpos)/Number(it.totalTag))*100}%` }}></div>
-                                                        </div>
-                                                        <span className="text-[8px] opacity-30 uppercase font-black tracking-widest">{it.limpos}L | {it.ferro || 0}F / {it.totalTag}T</span>
-                                                    </div>
-                                                </div>
-                                                <div className="text-right leading-none"><p className="text-xl font-black text-green-500 leading-none">+{it.limpos}</p><span className="text-[8px] opacity-20 uppercase font-black tracking-widest mt-1 block tracking-tighter">TUBOS</span></div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {h.items?.[0]?.notes && (
-                                        <div className="mt-4 px-2">
-                                            <p className="text-[8px] font-black uppercase opacity-20 mb-1 ml-1 tracking-widest text-slate-400">Observação Técnica</p>
-                                            <p className="text-[10px] text-slate-400 font-medium italic bg-white/5 p-4 rounded-2xl border border-white/5 leading-relaxed">"{h.items[0].notes}"</p>
+                                <section className="glass-dark p-8 rounded-[2.5rem] shadow-xl border border-white/5 relative dropdown-container">
+                                    <label className="text-[10px] font-black uppercase opacity-50 ml-2 mb-2 block tracking-widest">Área Operacional</label>
+                                    <input type="text" placeholder="SELECIONE A ÁREA..." value={areaSearch} onFocus={() => setShowAreaList(true)} onChange={(e) => { const v = e.target.value.toUpperCase(); setAreaSearch(v); setArea(v); }} className="w-full p-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400 placeholder-slate-900" />
+                                    {showAreaList && (
+                                        <div className="absolute z-[120] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-2xl border border-blue-500/40 overflow-hidden max-h-48 overflow-y-auto dropdown-scroll uppercase text-slate-300">
+                                            {AREAS_LISTA.filter(a => a.includes(areaSearch)).map(a => (
+                                                <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className="px-6 py-4 hover:bg-blue-600 text-[10px] font-black border-b border-white/5 cursor-pointer flex justify-between"><span>{a}</span><span className="opacity-30">SELECIONAR</span></div>
+                                            ))}
                                         </div>
                                     )}
-                                </div>
-                            ))}
-                            {filteredHistory.length === 0 && <div className="text-center py-24 opacity-10 font-black uppercase tracking-[0.3em] text-xs text-slate-400">Nenhum registo encontrado</div>}
-                        </div>
-                    </div>
-                )}
+                                </section>
 
-                {view === 'dash' && (
-                    <div className="space-y-6 animate-pop">
-                        <section className="glass-dark p-10 rounded-[4.5rem] shadow-2xl space-y-6 border border-white/5 border-t-8 border-t-blue-600 relative overflow-hidden">
-                            <div className="flex justify-between items-end text-left">
-                                <div className="space-y-1">
-                                    <h2 className="text-6xl font-black tracking-tighter leading-none text-white">{statsToday.totalL}</h2>
-                                    <p className="text-[11px] font-black opacity-30 uppercase tracking-[0.2em] text-slate-300">Tubos Limpos Hoje</p>
-                                </div>
-                                <div className="text-right"><p className="text-3xl font-black text-green-500">{statsToday.efficiency}%</p><p className="text-[8px] font-black opacity-30 uppercase leading-none text-slate-300">Eficiência Alumar</p></div>
+                                {items.map((it, idx) => (
+                                    <section key={idx} className="glass-dark p-8 rounded-[3.5rem] space-y-6 relative border-l-[12px] border-blue-600 shadow-2xl border border-white/5 dropdown-container">
+                                        {idx > 0 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} className="absolute top-6 right-6 text-red-500/40 hover:text-red-500 transition-all text-xs font-black">REMOVER</button>}
+                                        <div className="space-y-2 relative">
+                                            <label className="text-[10px] font-black uppercase opacity-50 ml-2 tracking-widest block leading-none mb-1">Equipamento (TAG)</label>
+                                            <input type="text" placeholder="SELECIONE O TAG..." value={it.search} onFocus={() => updateItem(idx, 'showList', true)} onChange={(e) => { const v = e.target.value.toUpperCase(); updateItem(idx, 'search', v); updateItem(idx, 'tag', v); }} className="w-full p-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400 placeholder-slate-900" />
+                                            {it.showList && (
+                                                <div className="absolute z-[110] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-2xl border border-blue-500/30 overflow-hidden text-slate-300 uppercase max-h-60 overflow-y-auto dropdown-scroll">
+                                                    {(AREA_TAG_MAPPING[area] || []).filter(t => t.includes(it.search)).map(tag => (
+                                                        <div key={tag} onClick={() => { updateItem(idx, 'tag', tag); updateItem(idx, 'search', tag); updateItem(idx, 'showList', false); }} className="px-6 py-4 hover:bg-blue-600 text-[10px] font-bold border-b border-white/5 cursor-pointer flex justify-between"><span>{tag}</span><span className="opacity-20">ESCOLHER</span></div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <div className="space-y-1"><label className="text-[9px] font-black uppercase text-green-500 text-center block tracking-tighter leading-none mb-1">Limpos</label><input type="number" value={it.limpos} onChange={e => updateItem(idx, 'limpos', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-white border border-slate-900" placeholder="0" /></div>
+                                            <div className="space-y-1"><label className="text-[9px] font-black uppercase text-red-500 text-center block tracking-tighter leading-none mb-1 italic">C. Ferro</label><input type="number" value={it.ferro} onChange={e => updateItem(idx, 'ferro', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-red-500 border border-red-900/30" placeholder="0" /></div>
+                                            <div className="space-y-1"><label className="text-[9px] font-black uppercase opacity-40 text-center block tracking-tighter leading-none mb-1">Total</label><input type="number" value={it.totalTag} onChange={e => updateItem(idx, 'totalTag', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-slate-500 border border-slate-900" /></div>
+                                        </div>
+                                        <textarea placeholder="Observações técnicas..." value={it.notes} onChange={e => updateItem(idx, 'notes', e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 outline-none font-bold text-xs h-24 resize-none text-slate-300"></textarea>
+                                    </section>
+                                ))}
+                                <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '' }])} className="w-full py-5 border-2 border-dashed border-blue-500/40 rounded-3xl text-blue-500 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">+ Adicionar TAG</button>
+                                <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] active:scale-95">{loading ? 'Salvando...' : 'Salvar Relatório Industrial'}</button>
                             </div>
-                            <div className="w-full h-5 bg-white/5 rounded-full overflow-hidden p-1 border border-white/5 shadow-inner"><div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(37,99,235,0.5)]" style={{ width: `${statsToday.efficiency}%` }}></div></div>
-                        </section>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="glass-dark p-10 rounded-[3rem] text-center border border-white/5 shadow-xl hover:bg-white/5 transition-all"><p className="text-3xl font-black text-white">{history.length}</p><p className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em] mt-2 text-xs leading-none">Registros Totais</p></div>
-                            <div className="glass-dark p-10 rounded-[3rem] text-center border border-white/5 shadow-xl hover:bg-white/5 transition-all uppercase leading-none"><p className="text-xl font-black text-blue-500 tracking-tighter leading-none">{history[0]?.company || '--'}</p><p className="text-[8px] font-black opacity-30 uppercase tracking-[0.2em] mt-2 leading-none text-xs">Unidade Ativa</p></div>
-                        </div>
-                        {isAdmin && (
-                            <button onClick={exportCSV} className="w-full py-7 bg-blue-600/10 text-blue-500 rounded-[2.5rem] font-black text-[11px] uppercase border border-blue-500/20 flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all mt-4 transition-colors transition-all"><FileText size={20} /> Exportar Base Master Completa (Admin CSV)</button>
+                        ) : (
+                            <div className="space-y-6 animate-pop">
+                                <section className="glass-dark p-10 rounded-[4.5rem] shadow-2xl border border-white/5 border-t-8 border-t-blue-600 relative overflow-hidden">
+                                    <div className="flex justify-between items-end">
+                                        <div className="space-y-1">
+                                            <h2 className="text-6xl font-black tracking-tighter leading-none">{statsToday.l}</h2>
+                                            <p className="text-[11px] font-black opacity-30 uppercase tracking-[0.2em] text-slate-300">Tubos Limpos Hoje</p>
+                                        </div>
+                                        <div className="text-right"><p className="text-3xl font-black text-green-500">{statsToday.eff}%</p><p className="text-[8px] font-black opacity-30 uppercase leading-none text-slate-300">Eficiência Geral</p></div>
+                                    </div>
+                                    <div className="w-full h-5 bg-white/5 rounded-full overflow-hidden p-1 border border-white/5 mt-6"><div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(37,99,235,0.5)]" style={{ width: `${statsToday.eff}%` }}></div></div>
+                                </section>
+                                {history.map(h => (
+                                    <div key={h.id} className="glass-dark p-8 rounded-[3.5rem] border border-white/5 shadow-2xl relative overflow-hidden text-left">
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">{h.company}</p>
+                                            <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none">{h.items?.[0]?.tag} {h.items?.length > 1 && <span className="text-xs opacity-20">+{h.items.length-1}</span>}</h4>
+                                            <p className="text-[9px] font-bold opacity-30 uppercase">{h.data} • {h.hora} • {h.turno}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         )}
-                    </div>
-                )}
-            </main>
+                    </main>
 
-            {/* NAV BAR */}
-            <nav className={`fixed bottom-0 left-0 right-0 ${darkMode ? 'glass-dark' : 'glass-light'} border-t border-white/10 p-10 flex justify-around items-center rounded-t-[5.5rem] z-[150] shadow-[0_-30px_90px_rgba(0,0,0,0.8)] backdrop-blur-3xl bg-slate-950/90`}>
-                <button onClick={() => setView('form')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'form' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-40 hover:opacity-100 transition-all'}`}>
-                    <ClipboardList size={26} strokeWidth={view === 'form' ? 3 : 2} />
-                    <span className="text-[8px] font-black uppercase tracking-tighter font-black tracking-widest text-xs">Lançar</span>
-                </button>
-                <button onClick={() => setView('history')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'history' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-40 hover:opacity-100 transition-all'}`}>
-                    <History size={26} strokeWidth={view === 'history' ? 3 : 2} />
-                    <span className="text-[8px] font-black uppercase tracking-tighter font-black tracking-widest text-xs">Registos</span>
-                </button>
-                <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'dash' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-40'}`}>
-                    <LayoutDashboard size={26} strokeWidth={view === 'dash' ? 3 : 2} />
-                    <span className="text-[8px] font-black uppercase tracking-tighter font-black tracking-widest text-xs">Painel</span>
-                </button>
-            </nav>
-        </div>
-    );
-};
-
-export default App;
+                    <nav className="fixed bottom-0 left-0 right-0 glass-dark border-t border-white/10 p-10 flex justify-around items-center rounded-t-[5.5rem] z-[150] shadow-[0_-30px_90px_rgba(0,0,0,0.8)] backdrop-blur-3xl bg-slate-950/90">
+                        <button onClick={() => setView('form')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'form' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-40 hover:opacity-100'}`}>
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                            <span className="text-[8px] font-black uppercase tracking-tighter">Lançar</span>
+                        </button>
+                        <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'dash' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-40 hover:opacity-100'}`}>
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                            <span className="text-[8px] font-black uppercase tracking-tighter">Painel</span>
+                        </button>
+                    </nav>
+                </div>
+            );
+        };
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
