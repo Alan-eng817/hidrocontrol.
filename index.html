@@ -9,7 +9,6 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <!-- Firebase SDKs -->
     <script type="module">
@@ -29,6 +28,7 @@
         .hide-scroll::-webkit-scrollbar { display: none; }
         input::placeholder { color: #475569; }
         .btn-active { transform: scale(0.95); opacity: 0.8; }
+        .custom-shadow { shadow-[0_10px_40px_rgba(37,99,235,0.15)] }
     </style>
 </head>
 <body class="overflow-x-hidden hide-scroll">
@@ -37,7 +37,7 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // ✅ CONFIGURAÇÃO MANTIDA (A QUE DEU CERTO)
+        // ✅ CONFIGURAÇÃO FIREBASE ALUMAR
         const CONFIG_MANUAL_FIREBASE = {
             apiKey: "AIzaSyAPM1NNw9PazMccz5kxZjFAqOYKLqQwLxo", 
             authDomain: "hidrocontrol-alumar.firebaseapp.com",
@@ -49,10 +49,30 @@
 
         const ADMIN_EMAIL = "alanlindoso1@gmail.com";
 
-        // Ícones Industriais
-        const IconLancar = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
-        const IconDash = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>;
-        const IconTrash = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>;
+        // Lista de TAGs Industrial
+        const EQUIPAMENTOS_LISTA = [
+            "025A-TC-21A", "025A-TC-21B", "025A-TC-21C", "025A-TC-21D", "025A-TC-21E", "025A-TC-21F",
+            "025A-TC-31A", "025A-TC-31B", "025A-TC-31C", "025A-TC-31D", "025A-TC-31E", "025A-TC-31F",
+            "030-TC-001", "030-TC-002", "030-TC-003", "030-TC-004", "030-TC-005", "030-TC-006", "030-TC-007", "030-TC-008", "030-TC-009", "030-TC-010",
+            "030-TC-011", "030-TC-011A", "030-TC-011B", "030-TC-11A", "030-TC-11B", "030-TC-11C", "030-TC-11D", "030-TC-11E", "030-TC-11F",
+            "030-TC-12A", "030-TC-12B", "030-TC-12C", "030-TC-12D", "030-TC-12E", "030-TC-12F",
+            "030-TC-13A", "030-TC-13B", "030-TC-13C", "030-TC-13D", "030-TC-13E", "030-TC-13F",
+            "030-TC-21A", "030-TC-21B", "030-TC-21C", "030-TC-21D", "030-TC-22A", "030-TC-22B", "030-TC-22C", "030-TC-22D",
+            "030-TC-23A", "030-TC-23B", "030-TC-23C", "030-TC-23D", "030-TC-24A", "030-TC-24B", "030-TC-24C", "030-TC-24D",
+            "030-VA-16", "030-VA-17", "030-VA-18",
+            "035-TC-011", "035-TC-012", "035-TC-013", "035K-TC-011", "035K-TC-012",
+            "040-TC-011", "040-TC-012", "040-TC-013", "040-TC-014", "040-TC-015",
+            "040-TC-021", "040-TC-022", "040-TC-023", "040-TC-024", "040-TC-025",
+            "042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015",
+            "042-TC-021", "042-TC-022", "042-TC-023", "042-TC-024", "042-TC-025",
+            "042-TC-031", "042-TC-032", "042-TC-033", "042-TC-034", "042-TC-035", "042-TC-039"
+        ];
+
+        // Ícones
+        const IconLancar = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+        const IconDash = () => <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>;
+        const IconCamera = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
+        const IconSearch = () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
 
         const App = () => {
             const [user, setUser] = useState(null);
@@ -61,8 +81,18 @@
             const [view, setView] = useState('form'); 
             const [history, setHistory] = useState([]);
             const [loading, setLoading] = useState(false);
-            const [loginData, setLoginData] = useState({ email: '', pass: '' });
-            const [items, setItems] = useState([{ tag: '', limpos: '', obs: '', ferro: '' }]);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [showTags, setShowTags] = useState(false);
+            
+            const [formData, setFormData] = useState({
+                turno: 'ADM',
+                equipamento: '',
+                limpos: '',
+                obs: '',
+                ferro: '',
+                fotoAntes: null,
+                fotoDepois: null
+            });
 
             useEffect(() => {
                 const init = async () => {
@@ -87,61 +117,53 @@
             const handleLogin = async (e) => {
                 e.preventDefault();
                 setLoading(true);
+                const email = e.target.email.value;
+                const pass = e.target.pass.value;
                 try {
-                    await window.FB_CORE.signInWithEmailAndPassword(auth, loginData.email, loginData.pass);
+                    await window.FB_CORE.signInWithEmailAndPassword(auth, email, pass);
                 } catch {
                     try {
-                        await window.FB_CORE.createUserWithEmailAndPassword(auth, loginData.email, loginData.pass);
+                        await window.FB_CORE.createUserWithEmailAndPassword(auth, email, pass);
                     } catch (err) { alert("Erro de Acesso: " + err.code); }
                 } finally { setLoading(false); }
             };
 
             const handleSend = async () => {
-                if (!db || items[0].tag === '') return;
+                if (!db || !formData.equipamento) return;
                 setLoading(true);
                 try {
                     await window.FB_CORE.addDoc(window.FB_CORE.collection(db, 'artifacts', 'hidrocontrol', 'public', 'data', 'registos'), {
                         data: new Date().toLocaleDateString('pt-BR'),
-                        items,
+                        items: [{
+                            tag: formData.equipamento,
+                            limpos: formData.limpos,
+                            obs: formData.obs,
+                            ferro: formData.ferro
+                        }],
+                        turno: formData.turno,
                         user: user.email,
                         ts: Date.now()
                     });
-                    setItems([{ tag: '', limpos: '', obs: '', ferro: '' }]);
+                    setFormData({ ...formData, equipamento: '', limpos: '', obs: '', ferro: '', fotoAntes: null, fotoDepois: null });
+                    setSearchTerm('');
                     setView('dash');
-                } catch (e) { alert("Erro ao salvar dados."); }
+                } catch (e) { alert("Erro ao salvar."); }
                 setLoading(false);
             };
 
-            const exportCSV = () => {
-                let csv = 'Data,Equipamento,Limpos,Obstruidos,Ferro,Operador\n';
-                history.forEach(rel => rel.items.forEach(it => {
-                    csv += `"${rel.data}","${it.tag}","${it.limpos}","${it.obs}","${it.ferro}","${rel.user}"\n`;
-                }));
-                const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = "Relatorio_HidroControl_Alumar.csv";
-                link.click();
-            };
+            const filteredTags = EQUIPAMENTOS_LISTA.filter(tag => 
+                tag.toLowerCase().includes(searchTerm.toLowerCase())
+            );
 
             if (!user) return (
                 <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950">
-                    <div className="glass w-full max-w-sm p-10 rounded-[3.5rem] shadow-2xl text-center space-y-8 animate-pop">
-                        <div className="space-y-2">
-                            <h1 className="font-black text-3xl uppercase italic tracking-tighter leading-none">HIDRO<span className="text-blue-500">CONTROL</span></h1>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">Monitoramento Industrial</p>
-                        </div>
+                    <div className="glass w-full max-w-sm p-10 rounded-[3.5rem] shadow-2xl text-center space-y-8 animate-pop border border-white/5">
+                        <h1 className="font-black text-3xl uppercase italic tracking-tighter leading-none">HIDRO<span className="text-blue-500">CONTROL</span></h1>
                         <form onSubmit={handleLogin} className="space-y-4 text-left">
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black uppercase text-slate-500 ml-4 tracking-widest">E-mail Corporativo</label>
-                                <input type="email" value={loginData.email} onChange={e => setLoginData({...loginData, email: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 outline-none text-sm font-bold placeholder-slate-700" placeholder="exemplo@gmail.com" required />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black uppercase text-slate-500 ml-4 tracking-widest">Palavra-passe</label>
-                                <input type="password" value={loginData.pass} onChange={e => setLoginData({...loginData, pass: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 outline-none text-sm font-bold placeholder-slate-700" placeholder="••••••••" required />
-                            </div>
-                            <button type="submit" className="w-full bg-blue-600 py-5 rounded-2xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4">
-                                {loading ? 'Validando...' : 'Entrar no Sistema'}
+                            <input name="email" type="email" placeholder="E-mail Corporativo" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 outline-none text-sm font-bold" required />
+                            <input name="pass" type="password" placeholder="Senha" className="w-full p-4 rounded-2xl bg-slate-900 border border-slate-800 outline-none text-sm font-bold" required />
+                            <button type="submit" className="w-full bg-blue-600 py-5 rounded-2xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all">
+                                {loading ? 'Entrando...' : 'Entrar no Sistema'}
                             </button>
                         </form>
                     </div>
@@ -152,85 +174,137 @@
                 <div className="min-h-screen flex flex-col max-w-lg mx-auto">
                     <header className="p-6 flex justify-between items-center sticky top-0 bg-slate-950/80 backdrop-blur-lg z-50 border-b border-white/5">
                         <div className="flex flex-col">
-                            <h1 className="font-black text-xl italic uppercase tracking-tighter">Hidro<span className="text-blue-500">Control</span></h1>
-                            <span className="text-[8px] font-bold opacity-30 uppercase tracking-widest">Alumar Unit</span>
+                            <h1 className="font-black text-xl italic uppercase tracking-tighter leading-none text-white">Hidro<span className="text-blue-500">Control</span></h1>
+                            <span className="text-[8px] font-bold opacity-30 uppercase tracking-[0.2em] mt-1 text-white">Alumar Monitor</span>
                         </div>
-                        <button onClick={() => window.FB_CORE.signOut(auth)} className="bg-red-500/10 text-red-500 text-[10px] font-black uppercase px-4 py-2 rounded-xl border border-red-500/20 active:bg-red-500/20">Sair</button>
+                        <button onClick={() => window.FB_CORE.signOut(auth)} className="bg-red-500/10 text-red-500 text-[10px] font-black uppercase px-4 py-2 rounded-xl border border-red-500/20 active:bg-red-500/20 transition-all">Sair</button>
                     </header>
 
-                    <main className="p-6 pb-40">
+                    <main className="p-6 pb-44">
                         {view === 'form' ? (
                             <div className="space-y-6 animate-pop">
-                                {items.map((it, i) => (
-                                    <div key={i} className="glass p-8 rounded-[3rem] border-l-[10px] border-blue-600/50 space-y-6 relative shadow-2xl">
-                                        {items.length > 1 && (
-                                            <button onClick={() => setItems(items.filter((_, idx) => idx !== i))} className="absolute top-6 right-6 text-slate-600 hover:text-red-500 transition-colors">
-                                                <IconTrash />
+                                {/* Seleção de Turno */}
+                                <section className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-500 ml-4 tracking-widest">Turno de Operação</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {['ADM', 'T.C', 'T.A'].map(t => (
+                                            <button 
+                                                key={t}
+                                                onClick={() => setFormData({...formData, turno: t})}
+                                                className={`py-4 rounded-2xl font-black text-xs transition-all border ${formData.turno === t ? 'bg-blue-600 border-blue-400 text-white shadow-lg scale-105' : 'bg-slate-900 border-slate-800 text-slate-500'}`}
+                                            >
+                                                {t}
                                             </button>
-                                        )}
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black uppercase text-slate-500 ml-2 tracking-widest">Identificação (TAG)</label>
+                                        ))}
+                                    </div>
+                                </section>
+
+                                {/* Pesquisa de TAG */}
+                                <section className="glass p-8 rounded-[3rem] space-y-6 shadow-2xl relative">
+                                    <div className="space-y-2 relative">
+                                        <label className="text-[10px] font-black uppercase text-slate-500 ml-2 tracking-widest">Identificação (TAG)</label>
+                                        <div className="relative">
+                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"><IconSearch /></div>
                                             <input 
                                                 type="text" 
-                                                placeholder="EX: 042-TC-039" 
-                                                value={it.tag} 
-                                                onChange={e => { const n = [...items]; n[i].tag = e.target.value.toUpperCase(); setItems(n); }} 
-                                                className="w-full p-5 rounded-2xl bg-slate-900/50 border border-slate-800 outline-none font-black text-blue-400 placeholder-slate-800 tracking-wider" 
+                                                placeholder="PESQUISAR TAG..." 
+                                                value={searchTerm}
+                                                onFocus={() => setShowTags(true)}
+                                                onChange={(e) => {
+                                                    setSearchTerm(e.target.value.toUpperCase());
+                                                    setShowTags(true);
+                                                }}
+                                                className="w-full pl-12 pr-4 py-5 rounded-2xl bg-slate-950 border border-slate-800 outline-none font-black text-blue-400 placeholder-slate-800 tracking-wider text-sm" 
                                             />
                                         </div>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <div className="space-y-2">
-                                                <label className="text-[9px] font-black uppercase text-green-500 block text-center tracking-tighter">Limpos</label>
-                                                <input type="number" placeholder="0" value={it.limpos} onChange={e => { const n = [...items]; n[i].limpos = e.target.value; setItems(n); }} className="w-full p-4 rounded-2xl bg-slate-900/50 border border-green-500/10 text-center font-black text-lg focus:border-green-500/50 transition-all outline-none" />
+
+                                        {showTags && searchTerm.length > 0 && (
+                                            <div className="absolute z-50 left-0 right-0 mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl max-h-48 overflow-y-auto">
+                                                {filteredTags.map(tag => (
+                                                    <div 
+                                                        key={tag} 
+                                                        onClick={() => {
+                                                            setFormData({...formData, equipamento: tag});
+                                                            setSearchTerm(tag);
+                                                            setShowTags(false);
+                                                        }}
+                                                        className="px-6 py-4 hover:bg-blue-600/20 cursor-pointer border-b border-slate-800/50 text-sm font-bold text-slate-300"
+                                                    >
+                                                        {tag}
+                                                    </div>
+                                                ))}
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[9px] font-black uppercase text-yellow-500 block text-center tracking-tighter">Obs.</label>
-                                                <input type="number" placeholder="0" value={it.obs} onChange={e => { const n = [...items]; n[i].obs = e.target.value; setItems(n); }} className="w-full p-4 rounded-2xl bg-slate-900/50 border border-yellow-500/10 text-center font-black text-lg focus:border-yellow-500/50 transition-all outline-none" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-[9px] font-black uppercase text-red-500 block text-center tracking-tighter">Ferro</label>
-                                                <input type="number" placeholder="0" value={it.ferro} onChange={e => { const n = [...items]; n[i].ferro = e.target.value; setItems(n); }} className="w-full p-4 rounded-2xl bg-slate-900/50 border border-red-500/10 text-center font-black text-lg text-red-500 focus:border-red-500/50 transition-all outline-none" />
-                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Contadores */}
+                                    <div className="grid grid-cols-3 gap-3">
+                                        <div className="space-y-2 text-center">
+                                            <label className="text-[9px] font-black uppercase text-green-500 tracking-tighter">Limpos</label>
+                                            <input type="number" value={formData.limpos} onChange={e => setFormData({...formData, limpos: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-green-500/10 text-center font-black text-lg focus:border-green-500/50 transition-all outline-none" placeholder="0" />
+                                        </div>
+                                        <div className="space-y-2 text-center">
+                                            <label className="text-[9px] font-black uppercase text-yellow-500 tracking-tighter">Obs.</label>
+                                            <input type="number" value={formData.obs} onChange={e => setFormData({...formData, obs: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-yellow-500/10 text-center font-black text-lg focus:border-yellow-500/50 transition-all outline-none" placeholder="0" />
+                                        </div>
+                                        <div className="space-y-2 text-center text-red-500">
+                                            <label className="text-[9px] font-black uppercase tracking-tighter">Ferro</label>
+                                            <input type="number" value={formData.ferro} onChange={e => setFormData({...formData, ferro: e.target.value})} className="w-full p-4 rounded-2xl bg-slate-950 border border-red-500/10 text-center font-black text-lg text-red-500 focus:border-red-500/50 transition-all outline-none" placeholder="0" />
                                         </div>
                                     </div>
-                                ))}
-                                <button onClick={() => setItems([...items, { tag: '', limpos: '', obs: '', ferro: '' }])} className="w-full py-4 border-2 border-dashed border-slate-800 rounded-3xl text-slate-500 font-black text-[10px] uppercase tracking-widest hover:border-blue-500 transition-all">+ Adicionar Equipamento</button>
-                                <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-6 rounded-[2.5rem] font-black uppercase text-sm shadow-[0_10px_40px_rgba(37,99,235,0.3)] active:scale-95 transition-all">
+
+                                    {/* Simulação de Fotos */}
+                                    <div className="grid grid-cols-2 gap-3 pt-2">
+                                        <button 
+                                            onClick={() => setFormData({...formData, fotoAntes: 'evidencia_antes.jpg'})}
+                                            className={`flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed transition-all ${formData.fotoAntes ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-slate-950 border-slate-800 text-slate-700'}`}
+                                        >
+                                            <IconCamera />
+                                            <span className="text-[9px] font-black uppercase">Foto Antes</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => setFormData({...formData, fotoDepois: 'evidencia_depois.jpg'})}
+                                            className={`flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed transition-all ${formData.fotoDepois ? 'bg-green-500/10 border-green-500 text-green-500' : 'bg-slate-950 border-slate-800 text-slate-700'}`}
+                                        >
+                                            <IconCamera />
+                                            <span className="text-[9px] font-black uppercase">Foto Depois</span>
+                                        </button>
+                                    </div>
+                                </section>
+
+                                <button 
+                                    onClick={handleSend} 
+                                    disabled={loading || !formData.equipamento} 
+                                    className="w-full bg-blue-600 py-6 rounded-[2.5rem] font-black uppercase text-sm shadow-[0_10px_40px_rgba(37,99,235,0.3)] active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
+                                >
                                     {loading ? 'Sincronizando...' : 'Enviar Produção'}
                                 </button>
                             </div>
                         ) : (
                             <div className="space-y-6 animate-pop">
-                                <div className="glass p-12 rounded-[3.5rem] text-center border-t-[10px] border-blue-600/50 shadow-2xl">
-                                    <div className="space-y-1">
+                                <div className="glass p-12 rounded-[3.5rem] text-center border-t-[10px] border-blue-600/50 shadow-2xl relative overflow-hidden">
+                                    <div className="relative z-10 space-y-1">
                                         <h2 className="text-7xl font-black tracking-tighter text-white">
                                             {history.reduce((acc, r) => acc + (r.items || []).reduce((a,i) => a + Number(i.limpos || 0), 0), 0)}
                                         </h2>
                                         <div className="flex items-center justify-center gap-2">
                                             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Total Acumulado</p>
+                                            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Total Limpos Acumulado</p>
                                         </div>
                                     </div>
                                 </div>
 
-                                {user.email === ADMIN_EMAIL && (
-                                    <button onClick={exportCSV} className="w-full py-5 bg-green-600/10 text-green-500 rounded-3xl font-black text-[11px] uppercase border border-green-500/20 active:bg-green-600/20 transition-all flex items-center justify-center gap-3">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
-                                        Exportar Base Excel (Admin)
-                                    </button>
-                                )}
-
                                 <div className="space-y-3 pt-4">
-                                    <label className="text-[10px] font-black uppercase text-slate-600 ml-4 tracking-widest">Histórico de Campo</label>
+                                    <label className="text-[10px] font-black uppercase text-slate-600 ml-4 tracking-widest">Histórico em Tempo Real</label>
                                     {history.slice(0, 15).map(h => (
-                                        <div key={h.id} className="glass p-5 rounded-[2rem] flex justify-between items-center border border-white/5 transition-all active:scale-95">
+                                        <div key={h.id} className="glass p-5 rounded-[2rem] flex justify-between items-center border border-white/5 transition-all">
                                             <div className="space-y-1">
-                                                <p className="text-sm font-black text-white tracking-tight">{h.items[0]?.tag} {h.items.length > 1 && <span className="text-[10px] text-blue-500 ml-1">+{h.items.length-1}</span>}</p>
-                                                <p className="text-[9px] font-bold text-slate-500 uppercase">{h.data} • {h.user.split('@')[0]}</p>
+                                                <p className="text-sm font-black text-white tracking-tight leading-none">{h.items[0]?.tag}</p>
+                                                <p className="text-[9px] font-bold text-slate-500 uppercase">{h.data} • {h.turno} • {h.user.split('@')[0]}</p>
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-base font-black text-green-500">+{h.items.reduce((a,i) => a + Number(i.limpos || 0), 0)}</p>
-                                                <p className="text-[8px] font-bold opacity-30 uppercase">Limpos</p>
+                                                <p className="text-[8px] font-bold opacity-30 uppercase tracking-widest">Limpos</p>
                                             </div>
                                         </div>
                                     ))}
@@ -239,15 +313,16 @@
                         )}
                     </main>
 
-                    <nav className="fixed bottom-0 left-0 right-0 glass border-t border-white/10 p-8 flex justify-around items-center rounded-t-[4rem] z-50 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]">
-                        <button onClick={() => setView('form')} className={`flex flex-col items-center gap-2 transition-all ${view === 'form' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}>
+                    {/* Barra de Navegação */}
+                    <nav className="fixed bottom-0 left-0 right-0 glass border-t border-white/10 p-10 flex justify-around items-center rounded-t-[4rem] z-50 shadow-[0_-20px_60px_rgba(0,0,0,0.6)]">
+                        <button onClick={() => setView('form')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'form' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-50'}`}>
                             <IconLancar />
-                            <span className="text-[8px] font-black uppercase tracking-tighter">Lançar</span>
+                            <span className="text-[9px] font-black uppercase tracking-tighter">Lançar</span>
                         </button>
                         <div className="w-[1px] h-8 bg-white/5"></div>
-                        <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-2 transition-all ${view === 'dash' ? 'text-blue-500 scale-125' : 'text-slate-600'}`}>
+                        <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'dash' ? 'text-blue-500 scale-125' : 'text-slate-600 opacity-50'}`}>
                             <IconDash />
-                            <span className="text-[8px] font-black uppercase tracking-tighter">Painel</span>
+                            <span className="text-[9px] font-black uppercase tracking-tighter">Painel</span>
                         </button>
                     </nav>
                 </div>
