@@ -3,7 +3,8 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, query, onSnapshot } from "firebase/firestore";
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut } from "firebase/auth";
 
-// --- CONFIGURAÇÃO FIREBASE ALUMAR (LAYOUT PREMIUM) ---
+// --- CONFIGURAÇÃO FIREBASE ALUMAR (LAYOUT PREMIUM CONSOLIDADO) ---
+// Nota: O ambiente fornece as variáveis __firebase_config, __app_id e __initial_auth_token automaticamente.
 const firebaseConfig = JSON.parse(__firebase_config);
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -74,9 +75,10 @@ const App = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(false);
     const [darkMode, setDarkMode] = useState(true);
-    const [historyFilter, setHistoryFilter] = useState('0'); 
+    const [historyFilter, setHistoryFilter] = useState('0'); // 0=Hoje, custom=Personalizado
     const [dateRange, setDateRange] = useState({ start: '', end: '' });
     
+    // Estados do Formulário
     const [company, setCompany] = useState('MONTISOL');
     const [turno, setTurno] = useState('ADM');
     const [area, setArea] = useState('');
@@ -113,6 +115,7 @@ const App = () => {
         return () => unsub();
     }, [user]);
 
+    // Comando central para fechar dropdowns ao clicar fora
     useEffect(() => {
         const handleOutside = (e) => {
             if (containerRef.current && !e.target.closest('.dropdown-container')) {
@@ -128,19 +131,24 @@ const App = () => {
     const filteredHistory = useMemo(() => {
         const todayStr = new Date().toLocaleDateString('pt-BR');
         const now = Date.now();
+        
         return history.filter(h => {
+            // Filtro Personalizado (Intervalo)
             if (historyFilter === 'custom' && dateRange.start && dateRange.end) {
                 const hDate = new Date(h.ts);
                 const sDate = new Date(dateRange.start + 'T00:00:00');
                 const eDate = new Date(dateRange.end + 'T23:59:59');
                 return hDate >= sDate && hDate <= eDate;
             }
+            
             if (historyFilter === '0') return h.data === todayStr;
+            
             const daysInMs = parseInt(historyFilter) * 24 * 60 * 60 * 1000;
             return (now - h.ts) <= daysInMs;
         });
     }, [history, historyFilter, dateRange]);
 
+    // KPI: Apenas Hoje
     const statsToday = useMemo(() => {
         const todayStr = new Date().toLocaleDateString('pt-BR');
         const todayData = history.filter(h => h.data === todayStr);
@@ -172,7 +180,7 @@ const App = () => {
             };
             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'registos'), docData);
             setView('success');
-        } catch (e) { console.error("Erro Save:", e); }
+        } catch (e) { console.error("Save Error:", e); }
         setLoading(false);
     };
 
@@ -210,31 +218,39 @@ const App = () => {
     return (
         <div ref={containerRef} className={`min-h-screen flex flex-col max-w-lg mx-auto ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
             
+            {/* TELA DE SUCESSO FIXA */}
             {view === 'success' && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-pop">
                     <div className="glass-dark w-full max-w-sm p-12 rounded-[4rem] text-center space-y-8 border border-white/10 shadow-2xl">
                         <div className="space-y-4">
-                            <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border-2 border-green-500/20 text-green-500">
-                               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6L9 17l-5-5"/></svg>
+                            <div className="w-24 h-24 bg-green-500/10 rounded-full flex items-center justify-center mx-auto border-2 border-green-500/20">
+                                <IconCheck />
                             </div>
-                            <h2 className="text-2xl font-black uppercase italic text-white leading-none">SINCRONIZADO!</h2>
+                            <div className="space-y-2">
+                                <h2 className="text-2xl font-black uppercase italic leading-none text-white">SINCRONIZADO!</h2>
+                                <p className="text-sm opacity-50 text-slate-300">Registo armazenado em nuvem.</p>
+                            </div>
                         </div>
-                        <div className="space-y-3">
+
+                        <div className="space-y-4">
                             <button onClick={() => window.open(getWhatsAppLink(history[0]), '_blank')} className="w-full bg-green-600 py-6 rounded-3xl font-black uppercase text-xs flex items-center justify-center gap-3 active:scale-95 shadow-lg"><IconWA /> Enviar para WhatsApp</button>
-                            <button onClick={() => { setView('form'); setArea(''); setAreaSearch(''); setItems([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }]); }} className="w-full bg-white/5 py-5 rounded-3xl font-black uppercase text-[10px] border border-white/10 text-white active:scale-95">Confirmar e Sair</button>
+                            
+                            <button onClick={() => { setView('form'); setArea(''); setAreaSearch(''); setItems([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }]); }} className={`w-full py-5 rounded-3xl font-black uppercase text-[10px] border tracking-widest transition-all active:scale-95 ${darkMode ? 'bg-white/5 border-white/10 text-white' : 'bg-slate-200 border-slate-300 text-slate-800'}`}>
+                                Confirmar e Concluir
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            <header className="p-6 flex justify-between items-center sticky top-0 z-50 backdrop-blur-3xl border-b border-white/5">
+            <header className="p-6 flex justify-between items-center sticky top-0 z-50 backdrop-blur-2xl border-b border-white/5">
                 <div className="flex flex-col">
                     <h1 className="font-black text-2xl italic uppercase tracking-tighter leading-none text-blue-500">Hidro<span className={darkMode ? 'text-white' : 'text-slate-900'}>Control</span></h1>
-                    <span className="text-[9px] font-bold opacity-30 uppercase tracking-[0.3em] mt-1">Intelligence</span>
+                    <span className="text-[9px] font-bold opacity-30 uppercase tracking-widest mt-1">Industrial Intelligence</span>
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => setDarkMode(!darkMode)} className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${darkMode ? 'border-white/10' : 'border-slate-300'}`}>{darkMode ? '☀️' : '🌙'}</button>
-                    <button onClick={() => signOut(auth)} className="bg-red-500/10 text-red-500 text-[9px] font-black uppercase px-4 py-2 rounded-xl border border-red-500/20 active:scale-90">Sair</button>
+                    <button onClick={() => signOut(auth)} className="bg-red-500/10 text-red-500 text-[9px] font-black uppercase px-4 py-2 rounded-xl border border-red-500/20 active:scale-90 transition-all">Sair</button>
                 </div>
             </header>
 
@@ -246,6 +262,7 @@ const App = () => {
                                 <button key={c} onClick={() => setCompany(c)} className={`py-5 rounded-2xl font-black text-xs border transition-all ${company === c ? 'bg-blue-600 border-blue-400 text-white shadow-lg scale-[1.02]' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}>{c}</button>
                             ))}
                         </div>
+
                         <div className="grid grid-cols-3 gap-2">
                             {['ADM', 'T.C', 'T.A'].map(t => (
                                 <button key={t} onClick={() => setTurno(t)} className={`py-4 rounded-2xl font-black text-xs border transition-all ${turno === t ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}>{t}</button>
@@ -255,56 +272,102 @@ const App = () => {
                         <section className="glass-dark p-8 rounded-[2.5rem] space-y-5 shadow-xl border border-white/5 relative dropdown-container">
                             <div className="space-y-2 relative">
                                 <label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500">Área Operacional</label>
-                                <input type="text" placeholder="BUSCAR ÁREA..." value={areaSearch} onFocus={() => setShowAreaList(true)} onChange={(e) => { const v = e.target.value.toUpperCase(); setAreaSearch(v); setArea(v); }} className="w-full p-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400" />
+                                <input 
+                                    type="text" placeholder="BUSCAR ÁREA..." value={areaSearch}
+                                    onFocus={() => setShowAreaList(true)} onClick={() => setShowAreaList(true)}
+                                    onChange={(e) => { const v = e.target.value.toUpperCase(); setAreaSearch(v); setArea(v); }}
+                                    className="w-full p-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400 placeholder-slate-800" 
+                                />
                                 {showAreaList && (
-                                    <div className="absolute z-[120] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-2xl border border-blue-500/40 overflow-hidden">
+                                    <div className="absolute z-[120] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-blue-500/40 overflow-hidden">
                                         <div className="max-h-48 overflow-y-auto dropdown-scroll">
                                             {AREAS_OPERACIONAIS_LISTA.filter(a => a.includes(areaSearch)).map(a => (
-                                                <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-black text-white border-b border-white/5 cursor-pointer flex justify-between"><span>{a}</span><span className="text-[7px] opacity-30 font-black">SELECIONAR</span></div>
+                                                <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-black text-white border-b border-white/5 cursor-pointer flex justify-between items-center transition-all">
+                                                    <span>{a}</span><span className="text-[7px] opacity-30 uppercase font-black">Selecionar</span>
+                                                </div>
                                             ))}
                                         </div>
                                     </div>
                                 )}
                             </div>
+
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1"><label className="text-[8px] font-bold uppercase opacity-30 ml-2">Chegada</label><input type="time" value={horarios.chegada} onChange={e => setHorarios({...horarios, chegada: e.target.value})} className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-black text-center text-white outline-none focus:border-blue-500" /></div>
-                                <div className="space-y-1"><label className="text-[8px] font-bold uppercase opacity-30 ml-2">Início</label><input type="time" value={horarios.inicio} onChange={e => setHorarios({...horarios, inicio: e.target.value})} className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-black text-center text-white outline-none focus:border-blue-500" /></div>
+                                <div className="space-y-1">
+                                    <label className="text-[8px] font-bold uppercase opacity-30 ml-2">Chegada Área</label>
+                                    <input type="time" value={horarios.chegada} onChange={e => setHorarios({...horarios, chegada: e.target.value})} className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-black text-center text-white focus:border-blue-500 outline-none" />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[8px] font-bold uppercase opacity-30 ml-2">Início Lavagem</label>
+                                    <input type="time" value={horarios.inicio} onChange={e => setHorarios({...horarios, inicio: e.target.value})} className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-black text-center text-white focus:border-blue-500 outline-none" />
+                                </div>
                             </div>
                         </section>
 
                         {items.map((it, idx) => (
                             <section key={idx} className="glass-dark p-8 rounded-[3.5rem] space-y-6 relative border-l-[12px] border-blue-600 shadow-2xl border border-white/5 dropdown-container">
                                 {idx > 0 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} className="absolute top-6 right-6 text-red-500/40 hover:text-red-500 transition-all"><IconTrash /></button>}
+                                
                                 <div className="space-y-2 relative">
                                     <label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500">TAG Equipamento</label>
-                                    <input type="text" placeholder="SELECIONE O TAG..." value={it.search} onFocus={() => updateItem(idx, 'showList', true)} onChange={(e) => { const v = e.target.value.toUpperCase(); updateItem(idx, 'search', v); updateItem(idx, 'tag', v); }} className="w-full p-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400" />
+                                    <input 
+                                        type="text" placeholder="SELECIONE O TAG..." value={it.search} 
+                                        onFocus={() => updateItem(idx, 'showList', true)} onClick={() => updateItem(idx, 'showList', true)}
+                                        onChange={(e) => { const v = e.target.value.toUpperCase(); updateItem(idx, 'search', v); updateItem(idx, 'tag', v); }} 
+                                        className="w-full p-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400 placeholder-slate-800" 
+                                    />
                                     {it.showList && (
-                                        <div className="absolute z-[110] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-2xl border border-blue-500/30 overflow-hidden">
+                                        <div className="absolute z-[110] left-0 right-0 mt-2 bg-slate-900 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.9)] border border-blue-500/30 overflow-hidden">
                                             <div className="max-h-60 overflow-y-auto dropdown-scroll">
                                                 {(AREA_TAG_MAPPING[area] || EQUIPAMENTOS_LISTA).filter(t => t.includes(it.search)).map(tag => (
-                                                    <div key={tag} onClick={() => { updateItem(idx, 'tag', tag); updateItem(idx, 'search', tag); updateItem(idx, 'showList', false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-bold text-white border-b border-white/5 cursor-pointer flex justify-between"><span>{tag}</span><span className="text-[7px] opacity-20 font-black">SELECIONAR</span></div>
+                                                    <div key={tag} onClick={() => { updateItem(idx, 'tag', tag); updateItem(idx, 'search', tag); updateItem(idx, 'showList', false); }} className="px-6 py-4 hover:bg-blue-600 text-xs font-bold text-white border-b border-white/5 cursor-pointer flex justify-between items-center transition-colors">
+                                                        <span>{tag}</span><span className="text-[7px] opacity-20 uppercase font-black">Selecionar</span>
+                                                    </div>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
                                 </div>
+
                                 <div className="grid grid-cols-3 gap-2">
-                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-green-500 text-center block tracking-tighter">Limpos</label><input type="number" value={it.limpos} onChange={e => updateItem(idx, 'limpos', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-white border border-slate-900" placeholder="0" /></div>
-                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase text-red-500 text-center block tracking-tighter italic">C. Ferro</label><input type="number" value={it.ferro} onChange={e => updateItem(idx, 'ferro', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-red-500 border border-red-900/30" placeholder="0" /></div>
-                                    <div className="space-y-1"><label className="text-[9px] font-black uppercase opacity-40 text-center block tracking-tighter">Total</label><input type="number" value={it.totalTag} onChange={e => updateItem(idx, 'totalTag', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-slate-500 border border-slate-900" /></div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black uppercase text-green-500 text-center block tracking-tighter">Limpos</label>
+                                        <input type="number" value={it.limpos} onChange={e => updateItem(idx, 'limpos', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-white border border-slate-900 shadow-inner" placeholder="0" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black uppercase text-red-500 text-center block tracking-tighter italic">C. Ferro</label>
+                                        <input type="number" value={it.ferro} onChange={e => updateItem(idx, 'ferro', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-red-500 border border-red-900/30 shadow-inner" placeholder="0" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[9px] font-black uppercase opacity-40 text-center block tracking-tighter">Total</label>
+                                        <input type="number" value={it.totalTag} onChange={e => updateItem(idx, 'totalTag', e.target.value)} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-slate-500 border border-slate-900" />
+                                    </div>
                                 </div>
+
                                 <div className="space-y-3 pt-2">
                                     <label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500">Evidências Técnicas (Máx 4)</label>
                                     <div className="grid grid-cols-2 gap-2">
-                                        <label className="flex items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-white/10 cursor-pointer bg-slate-950 hover:bg-blue-600/10"><IconCamera /><span className="text-[9px] font-black uppercase text-slate-400">Antes</span><input type="file" accept="image/*" capture="environment" /></label>
-                                        <label className="flex items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-white/10 cursor-pointer bg-slate-950 hover:bg-green-600/10"><IconCamera /><span className="text-[9px] font-black uppercase text-slate-400">Depois</span><input type="file" accept="image/*" capture="environment" /></label>
+                                        <label className="flex items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-white/10 cursor-pointer bg-slate-950 hover:bg-blue-600/10 transition-all"><IconCamera /><span className="text-[9px] font-black uppercase text-slate-400">Antes</span><input type="file" accept="image/*" capture="environment" /></label>
+                                        <label className="flex items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-white/10 cursor-pointer bg-slate-950 hover:bg-green-600/10 transition-all"><IconCamera /><span className="text-[9px] font-black uppercase text-slate-400">Depois</span><input type="file" accept="image/*" capture="environment" /></label>
                                     </div>
+                                    {it.photos.length > 0 && (
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {it.photos.map((p, pIdx) => (
+                                                <div key={pIdx} className="relative aspect-square rounded-xl overflow-hidden border border-white/10 shadow-lg"><img src={p.url} className="w-full h-full object-cover" /><div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[6px] font-black text-white p-1 text-center uppercase">{p.type}</div></div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="space-y-1"><label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500">Observações de Campo</label><textarea placeholder="Pendências ou detalhes..." value={it.notes} onChange={e => updateItem(idx, 'notes', e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 outline-none font-bold text-xs h-28 resize-none text-slate-300"></textarea></div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black uppercase opacity-50 ml-2 text-slate-500">Observações de Campo</label>
+                                    <textarea placeholder="Relate detalhes, pendências ou impactos..." value={it.notes} onChange={e => updateItem(idx, 'notes', e.target.value)} className="w-full p-5 rounded-2xl bg-slate-950 border border-slate-800 outline-none font-bold text-xs h-28 resize-none text-slate-300"></textarea>
+                                </div>
                             </section>
                         ))}
+
                         <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false, notes: '', photos: [] }])} className="w-full py-6 border-2 border-dashed border-blue-500/40 rounded-3xl text-blue-500 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all">+ Adicionar TAG</button>
-                        <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] transition-all active:scale-95">{loading ? 'SINCRONIZANDO...' : 'SALVAR RELATÓRIO'}</button>
+                        
+                        <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] transition-all active:scale-95">{loading ? 'CONECTANDO...' : 'ENVIAR PRODUÇÃO'}</button>
                     </div>
                 )}
 
@@ -335,21 +398,28 @@ const App = () => {
                                     <div className="flex justify-between items-start">
                                         <div className="space-y-1 text-slate-300">
                                             <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">{h.company}</p>
-                                            <h4 className="text-xl font-black text-white uppercase tracking-tighter">{h.items?.[0]?.tag}</h4>
+                                            <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none">{h.items?.[0]?.tag}</h4>
                                             <p className="text-[9px] font-bold opacity-30 uppercase">{h.data} • {h.hora} • {h.turno}</p>
                                         </div>
-                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className="w-12 h-12 bg-green-500/20 text-green-500 rounded-2xl flex items-center justify-center border border-green-500/20 active:scale-90 shadow-lg shadow-green-500/10"><IconWA /></button>
+                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className="w-12 h-12 bg-green-500/20 text-green-500 rounded-2xl flex items-center justify-center border border-green-500/20 active:scale-90 transition-all shadow-lg shadow-green-500/10"><IconWA /></button>
                                     </div>
                                     <div className="bg-slate-950/50 p-5 rounded-3xl border border-white/5 space-y-3">
                                         {(h.items || []).map((it, idx) => (
                                             <div key={idx} className="flex justify-between items-center border-b border-white/5 last:border-none pb-3 last:pb-0 text-slate-300">
-                                                <div className="space-y-1"><p className="text-[11px] font-black">{it.tag}</p><p className="text-[8px] opacity-30 uppercase font-black">{it.limpos} Limpos | {it.ferro || 0} Ferro / {it.totalTag} Total</p></div>
-                                                <div className="text-right leading-none"><p className="text-xl font-black text-green-500 leading-none">+{it.limpos}</p><span className="text-[8px] opacity-20 uppercase font-black">Tubos</span></div>
+                                                <div className="space-y-1">
+                                                    <p className="text-[11px] font-black">{it.tag}</p>
+                                                    <p className="text-[8px] opacity-30 uppercase font-black">{it.limpos} Limpos | {it.ferro || 0} Ferro / {it.totalTag} Total</p>
+                                                </div>
+                                                <div className="text-right leading-none">
+                                                    <p className="text-xl font-black text-green-500 leading-none">+{it.limpos}</p>
+                                                    <span className="text-[8px] opacity-20 uppercase font-black">Tubos</span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
                             ))}
+                            {filteredHistory.length === 0 && <div className="text-center py-20 opacity-20 font-black uppercase tracking-widest text-xs">Nenhum registo encontrado</div>}
                         </div>
                     </div>
                 )}
@@ -367,8 +437,8 @@ const App = () => {
                             <div className="w-full h-5 bg-white/5 rounded-full overflow-hidden p-1"><div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(37,99,235,0.5)]" style={{ width: `${statsToday.efficiency}%` }}></div></div>
                         </section>
                         <div className="grid grid-cols-2 gap-4">
-                            <div className="glass-dark p-8 rounded-[3rem] text-center border border-white/5 shadow-xl transition-all"><p className="text-2xl font-black text-white">{history.length}</p><p className="text-[8px] font-black opacity-30 uppercase tracking-widest mt-1">Registros Totais</p></div>
-                            <div className="glass-dark p-8 rounded-[3rem] text-center border border-white/5 shadow-xl transition-all"><p className="text-xl font-black text-blue-500 leading-tight uppercase">{history[0]?.company || '--'}</p><p className="text-[8px] font-black opacity-30 uppercase tracking-widest mt-1">Ativo na Unidade</p></div>
+                            <div className="glass-dark p-8 rounded-[3rem] text-center border border-white/5 shadow-xl transition-all active:scale-95"><p className="text-2xl font-black text-white">{history.length}</p><p className="text-[8px] font-black opacity-30 uppercase tracking-widest mt-1">Registros Salvos</p></div>
+                            <div className="glass-dark p-8 rounded-[3rem] text-center border border-white/5 shadow-xl transition-all active:scale-95"><p className="text-xl font-black text-blue-500 leading-tight uppercase">{history[0]?.company || '--'}</p><p className="text-[8px] font-black opacity-30 uppercase tracking-widest mt-1">Ativo na Unidade</p></div>
                         </div>
                         {isAdmin && (
                             <button onClick={exportCSV} className="w-full py-6 bg-blue-600/10 text-blue-500 rounded-3xl font-black text-[11px] uppercase border border-blue-500/20 flex items-center justify-center gap-3 shadow-lg active:scale-95 transition-all"><IconRegistos /> Exportar Base Master (Excel CSV)</button>
@@ -377,10 +447,22 @@ const App = () => {
                 )}
             </main>
 
+            {/* NAV BAR */}
             <nav className={`fixed bottom-0 left-0 right-0 ${darkMode ? 'glass-dark' : 'glass-light'} border-t border-white/10 p-10 flex justify-around items-center rounded-t-[5.5rem] z-[150] shadow-[0_-30px_90px_rgba(0,0,0,0.8)] backdrop-blur-3xl`}>
-                <button onClick={() => setView('form')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'form' ? 'text-blue-500 scale-150' : 'text-slate-600 opacity-40'}`}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span className="text-[7px] font-black uppercase tracking-tighter">Lançar</span></button>
-                <button onClick={() => setView('history')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'history' ? 'text-blue-500 scale-150' : 'text-slate-600 opacity-40'}`}><IconRegistos /><span className="text-[7px] font-black uppercase tracking-tighter">Registos</span></button>
-                <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'dash' ? 'text-blue-500 scale-150' : 'text-slate-600 opacity-40'}`}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg><span className="text-[9px] font-black uppercase tracking-tighter">Painel</span></button>
+                <button onClick={() => setView('form')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'form' ? 'text-blue-500 scale-150' : 'text-slate-600 opacity-40'}`}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 1 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    <span className="text-[7px] font-black uppercase tracking-tighter">Lançar</span>
+                </button>
+                
+                <button onClick={() => setView('history')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'history' ? 'text-blue-500 scale-150' : 'text-slate-600 opacity-40'}`}>
+                    <IconRegistos />
+                    <span className="text-[7px] font-black uppercase tracking-tighter">Registos</span>
+                </button>
+                
+                <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-2 transition-all duration-300 ${view === 'dash' ? 'text-blue-500 scale-150' : 'text-slate-600 opacity-40'}`}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+                    <span className="text-[9px] font-black uppercase tracking-tighter">Painel</span>
+                </button>
             </nav>
         </div>
     );
