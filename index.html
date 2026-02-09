@@ -16,29 +16,34 @@
         import { getFirestore, collection, addDoc, query, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
+        // Disponibiliza o Firebase para o script Babel
         window.FB_CORE = { initializeApp, getFirestore, collection, addDoc, query, onSnapshot, getAuth, signInAnonymously, onAuthStateChanged, signOut };
     </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        .glass-dark { background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(24px); }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; transition: background-color 0.3s ease; }
+        
+        /* Glassmorphism Dinâmico */
+        .glass-dark { background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(24px); }
+        .glass-light { background: rgba(255, 255, 255, 1); border: 1px solid rgba(0, 0, 0, 0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+        
         .animate-pop { animation: fadeIn 0.25s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
         .dropdown-scroll::-webkit-scrollbar { width: 6px; }
         .dropdown-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
         .hide-scroll::-webkit-scrollbar { display: none; }
         
-        /* Botão de Registro Central Premium */
+        /* Botão Central Premium Industrial */
         .center-btn {
             transform: translateY(-28px);
-            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.5);
-            border: 5px solid #0f172a;
+            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.45);
             z-index: 100;
         }
-        .center-btn:active { transform: translateY(-25px) scale(0.92); }
+        .center-btn:active { transform: translateY(-24px) scale(0.92); }
         
-        /* Janela de Seleção (Dropdown) por cima de tudo */
+        /* Janelas de Seleção Corrigidas (Z-Index Máximo) */
         .select-window {
             position: absolute;
             left: 0;
@@ -46,14 +51,15 @@
             top: 100%;
             z-index: 999 !important;
             margin-top: 8px;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
-            border: 1px solid rgba(59, 130, 246, 0.4);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+            border-radius: 1.5rem;
+            overflow: hidden;
         }
 
-        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
     </style>
 </head>
-<body class="bg-slate-950 overflow-x-hidden hide-scroll text-slate-200">
+<body class="overflow-x-hidden hide-scroll">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -79,7 +85,6 @@
             appId: "1:1080945827345:web:bd083793e95f943cb25bb0"
         };
 
-        // --- MAPEAMENTO ÁREA X TAG (RELAÇÃO ALAN ALVES) ---
         const AREA_TAG_MAPPING = {
             "025A": ["025A-TC-21A", "025A-TC-21B", "025A-TC-21C", "025A-TC-21D", "025A-TC-21E", "025A-TC-21F", "025A-TC-31A", "025A-TC-31B", "025A-TC-31C", "025A-TC-31D", "025A-TC-31E", "025A-TC-31F"],
             "030I": ["030-TC-001", "030-TC-002", "030-TC-003", "030-TC-004", "030-TC-005", "030-TC-006", "030-TC-007", "030-TC-008", "030-TC-009", "030-TC-010", "030-TC-019", "030-TC-11A", "030-TC-11B", "030-TC-11C", "030-TC-11D", "030-TC-11E", "030-TC-11F", "030-TC-12A", "030-TC-12B", "030-TC-12C", "030-TC-12D", "030-TC-12E", "030-TC-12F", "030-TC-13A", "030-TC-13B", "030-TC-13C", "030-TC-13D", "030-TC-13E", "030-TC-13F", "030-TC-17A", "030-TC-17B", "030-TC-17C", "030-TC-17D", "030-TC-17E", "030-TC-17F", "030-TC-18A", "030-TC-18B", "030-TC-18C", "030-TC-18D", "030-TC-18E", "030-TC-18F"],
@@ -93,16 +98,15 @@
             "042III": ["042-TC-031", "042-TC-032", "042-TC-033", "042-TC-034", "042-TC-035", "042-TC-036", "042-TC-037", "042-TC-038", "042-TC-039"]
         };
 
-        // --- RELAÇÃO DE TOTAIS ---
         const EQUIPAMENTOS_TOTAIS = {
+            ...Object.fromEntries(Object.values(AREA_TAG_MAPPING).flat().map(t=>[t, 180])),
             ...Object.fromEntries(["025A-TC-21A", "025A-TC-21B", "025A-TC-21C", "025A-TC-21D", "025A-TC-21E", "025A-TC-21F", "025A-TC-31A", "025A-TC-31B", "025A-TC-31C", "025A-TC-31D", "025A-TC-31E", "025A-TC-31F"].map(t=>[t, 33])),
             ...Object.fromEntries(["030-TC-17A", "030-TC-17B", "030-TC-17C", "030-TC-17D", "030-TC-17E", "030-TC-17F", "030-TC-18A", "030-TC-18B", "030-TC-18C", "030-TC-18D", "030-TC-18E", "030-TC-18F"].map(t=>[t, 33])),
             "030-TC-001": 600, "030-TC-019": 600, "030-TC-029": 600,
             ...Object.fromEntries(["030-TC-002", "030-TC-003", "030-TC-004", "030-TC-005", "030-TC-006", "030-TC-007", "030-TC-008"].map(t=>[t, 880])),
             "030-TC-009": 1000, "030-TC-010": 1000,
             ...Object.fromEntries(["040-TC-011", "040-TC-012", "040-TC-013", "040-TC-014", "040-TC-015", "040-TC-021", "040-TC-022", "040-TC-023", "040-TC-024", "040-TC-025", "040-TC-031", "040-TC-032", "040-TC-033", "040-TC-034", "040-TC-035", "040K-TC-011"].map(t=>[t, 1000])),
-            ...Object.fromEntries(["042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015", "042-TC-016", "042-TC-017", "042-TC-018", "042-TC-019", "042-TC-021", "042-TC-022", "042-TC-023", "042-TC-024", "042-TC-025", "042-TC-026", "042-TC-027", "042-TC-028", "042-TC-029", "042-TC-031", "042-TC-032", "042-TC-033", "042-TC-034", "042-TC-035", "042-TC-036", "042-TC-037", "042-TC-038", "042-TC-039"].map(t=>[t, 1000])),
-            ...Object.fromEntries(["030-TC-11A", "030-TC-11B", "030-TC-11C", "030-TC-11D", "030-TC-11E", "030-TC-11F", "030-TC-12A", "030-TC-12B", "030-TC-12C", "030-TC-12D", "030-TC-12E", "030-TC-12F", "030-TC-13A", "030-TC-13B", "030-TC-13C", "030-TC-13D", "030-TC-13E", "030-TC-13F", "030-TC-21A", "030-TC-21B", "030-TC-22A", "030-TC-22B", "030-TC-22C", "030-TC-22D", "030-TC-23A", "030-TC-23B", "030-TC-23C", "030-TC-23D", "030-TC-24A", "030-TC-24B", "030-TC-24C", "030-TC-24D", "030-TC-25A", "030-TC-25B", "030-TC-25C", "030-TC-25D", "030-TC-26A", "030-TC-26B", "030-TC-26C", "030-TC-26D", "030-TC-26E", "030-TC-26F", "030-TC-31A", "030-TC-31B", "030-TC-32A", "030-TC-32B", "030-TC-32C", "030-TC-32D", "030-TC-33A", "030-TC-33B", "030-TC-33C", "030-TC-33D", "030-TC-34A", "030-TC-34B", "030-TC-34C", "030-TC-34D", "030-TC-35A", "030-TC-35B", "030-TC-35C", "030-TC-35D", "030-TC-36A", "030-TC-36B", "030-TC-36C", "030-TC-36D", "030-TC-36E", "030-TC-36F", "030-TC-41A", "030-TC-41B", "030-TC-42A", "030-TC-42B", "030-TC-42C", "030-TC-42D", "030-TC-43A", "030-TC-43B", "030-TC-43C", "030-TC-43D", "030-TC-44A", "030-TC-44B", "030-TC-44C", "030-TC-44D", "030-TC-45A", "030-TC-45B", "030-TC-45C", "030-TC-45D", "030-TC-46A", "030-TC-46B", "030-TC-46C", "030-TC-46D", "030-TC-46E", "030-TC-46F"].map(t=>[t, 180]))
+            ...Object.fromEntries(["042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015", "042-TC-016", "042-TC-017", "042-TC-018", "042-TC-019", "042-TC-021", "042-TC-022", "042-TC-023", "042-TC-024", "042-TC-025", "042-TC-026", "042-TC-027", "042-TC-028", "042-TC-029", "042-TC-031", "042-TC-032", "042-TC-033", "042-TC-034", "042-TC-035", "042-TC-036", "042-TC-037", "042-TC-038", "042-TC-039"].map(t=>[t, 1000]))
         };
 
         const EQUIPAMENTOS_ALL = Object.keys(EQUIPAMENTOS_TOTAIS);
@@ -124,8 +128,6 @@
             const [showAreaList, setShowAreaList] = useState(false);
             const [items, setItems] = useState([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false }]);
 
-            const containerRef = useRef(null);
-
             // --- FIREBASE SYNC ---
             useEffect(() => {
                 const interval = setInterval(() => {
@@ -144,7 +146,7 @@
                                     setHistory(data.sort((a,b) => b.ts - a.ts));
                                 });
                             } else {
-                                fb.signInAnonymously(auth).catch(e => console.error("Login Error", e));
+                                fb.signInAnonymously(auth).catch(e => console.error("Login Fail", e));
                             }
                         });
                     }
@@ -152,7 +154,6 @@
                 return () => clearInterval(interval);
             }, []);
 
-            // --- LÓGICA DE FILTRAGEM ---
             const filteredHistory = useMemo(() => {
                 const now = Date.now();
                 const todayStr = new Date().toLocaleDateString('pt-BR');
@@ -203,7 +204,7 @@
                     };
                     await fb.addDoc(fb.collection(db, 'artifacts', 'hidrocontrol-alumar', 'public', 'data', 'registos'), docData);
                     setView('success');
-                } catch (e) { console.error("Save Fail", e); }
+                } catch (e) { console.error("Save Error", e); }
                 setLoading(false);
             };
 
@@ -213,68 +214,64 @@
             };
 
             if (!user) return (
-                <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white text-center">
-                    <div className="space-y-4">
-                        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                        <p className="text-[10px] font-black uppercase tracking-widest opacity-40">HidroControl App 3.0</p>
-                    </div>
+                <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+                    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
                 </div>
             );
 
             return (
-                <div className={`min-h-screen flex flex-col max-w-lg mx-auto ${darkMode ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'}`}>
+                <div className={`min-h-screen flex flex-col max-w-lg mx-auto transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-black'}`}>
                     
                     {view === 'success' && (
                         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-pop text-center">
-                            <div className="glass-dark w-full max-w-sm p-12 rounded-[4rem] space-y-8 border border-white/10 shadow-2xl">
+                            <div className={`${darkMode ? 'glass-dark' : 'glass-light shadow-2xl'} w-full max-w-sm p-12 rounded-[4rem] space-y-8`}>
                                 <IconCheck className="mx-auto" />
-                                <h2 className="text-2xl font-black uppercase italic tracking-tighter text-white">SINCRONIZADO!</h2>
+                                <h2 className={`text-2xl font-black uppercase italic tracking-tighter ${darkMode ? 'text-white' : 'text-black'}`}>SINCRONIZADO!</h2>
                                 <button onClick={() => setView('history')} className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs active:scale-95 shadow-lg shadow-blue-600/30 text-white">Ver Registros</button>
                             </div>
                         </div>
                     )}
 
-                    <header className="p-6 flex justify-between items-center sticky top-0 z-50 backdrop-blur-3xl border-b border-white/5 bg-slate-950/80">
+                    <header className={`p-6 flex justify-between items-center sticky top-0 z-50 backdrop-blur-3xl border-b transition-all ${darkMode ? 'border-white/5 bg-slate-950/80' : 'border-slate-200 bg-white/90 shadow-sm'}`}>
                         <div className="flex flex-col text-left">
-                            <h1 className="font-black text-2xl italic uppercase tracking-tighter leading-none text-blue-500">Hidro<span className={darkMode ? 'text-white' : 'text-slate-900'}>Control</span></h1>
-                            <span className="text-[9px] font-bold opacity-30 uppercase tracking-widest mt-1">ALUMAR PREMIUM v3.0</span>
+                            <h1 className={`font-black text-2xl italic uppercase tracking-tighter leading-none ${darkMode ? 'text-blue-500' : 'text-blue-700'}`}>Hidro<span className={darkMode ? 'text-white' : 'text-black'}>Control</span></h1>
+                            <span className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${darkMode ? 'opacity-40' : 'text-slate-600'}`}>ALUMAR PREMIUM v3.0</span>
                         </div>
-                        <button onClick={() => setDarkMode(!darkMode)} className="w-10 h-10 rounded-full flex items-center justify-center border border-white/10">{darkMode ? '☀️' : '🌙'}</button>
+                        <button onClick={() => setDarkMode(!darkMode)} className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${darkMode ? 'border-white/10 bg-slate-900 text-white' : 'border-slate-300 bg-white text-black shadow-sm'}`}>{darkMode ? '☀️' : '🌙'}</button>
                     </header>
 
-                    <main className="p-6 pb-48 space-y-6 overflow-y-auto hide-scroll text-slate-800 dark:text-slate-200">
+                    <main className="p-6 pb-48 space-y-6 overflow-y-auto hide-scroll">
                         {view === 'form' && (
                             <div className="space-y-6 animate-pop">
                                 <div className="grid grid-cols-2 gap-2">
                                     {['MONTISOL', 'CONSTEC'].map(c => (
-                                        <button key={c} onClick={() => setCompany(c)} className={`py-5 rounded-2xl font-black text-xs border transition-all ${company === c ? 'bg-blue-600 text-white border-blue-400 shadow-lg scale-[1.02]' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}>{c}</button>
+                                        <button key={c} onClick={() => setCompany(c)} className={`py-5 rounded-2xl font-black text-xs border transition-all ${company === c ? 'bg-blue-600 border-blue-400 text-white shadow-lg scale-[1.02]' : (darkMode ? 'bg-slate-900/50 border-white/5 text-slate-500' : 'bg-white border-slate-200 text-slate-900 shadow-sm')}`}>{c}</button>
                                     ))}
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
                                     {['ADM', 'T.C', 'T.A'].map(t => (
-                                        <button key={t} onClick={() => setTurno(t)} className={`py-4 rounded-2xl font-black text-xs border transition-all ${turno === t ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : 'bg-slate-900/50 border-white/5 text-slate-500'}`}>{t}</button>
+                                        <button key={t} onClick={() => setTurno(t)} className={`py-4 rounded-2xl font-black text-xs border transition-all ${turno === t ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : (darkMode ? 'bg-slate-900/50 border-white/5 text-slate-500' : 'bg-white border-slate-200 text-slate-900 shadow-sm')}`}>{t}</button>
                                     ))}
                                 </div>
 
-                                {/* ÁREA OPERACIONAL */}
-                                <section className="glass-dark p-8 rounded-[2.5rem] shadow-xl border border-white/5 relative text-left" style={{ zIndex: showAreaList ? 300 : 10 }}>
-                                    <label className="text-[10px] font-black uppercase opacity-50 ml-2 mb-2 block tracking-widest">Área Operacional</label>
+                                <section className={`${darkMode ? 'glass-dark' : 'glass-light'} p-8 rounded-[2.5rem] relative text-left`} style={{ zIndex: showAreaList ? 300 : 10 }}>
+                                    <label className={`text-[10px] font-black uppercase mb-2 block tracking-widest ${darkMode ? 'text-slate-400' : 'text-black'}`}>Área Operacional</label>
                                     <div className="relative">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"><MapPin /></div>
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"><MapPin /></div>
                                         <input 
                                             type="text" 
                                             placeholder="BUSCAR ÁREA..." 
                                             value={areaSearch} 
                                             onFocus={() => setShowAreaList(true)} 
                                             onChange={(e) => { setAreaSearch(e.target.value.toUpperCase()); setShowAreaList(true); }} 
-                                            className="w-full pl-12 pr-5 py-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400 placeholder-slate-800 shadow-inner" 
+                                            className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black placeholder-slate-300 focus:border-blue-500'}`} 
                                         />
                                     </div>
                                     {showAreaList && (
-                                        <div className="select-window glass-dark rounded-2xl shadow-2xl border border-blue-500/30 overflow-hidden">
-                                            <div className="max-h-64 overflow-y-auto dropdown-scroll uppercase text-slate-300">
+                                        <div className={`select-window ${darkMode ? 'glass-dark' : 'bg-white border-slate-300'} border`}>
+                                            <div className="max-h-64 overflow-y-auto dropdown-scroll uppercase">
                                                 {AREAS_LISTA.filter(a => a.includes(areaSearch)).map(a => (
-                                                    <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className="px-6 py-5 hover:bg-blue-600 text-xs font-black border-b border-white/5 cursor-pointer flex justify-between uppercase text-white transition-all"><span>{a}</span><span className="opacity-30">SELECIONAR</span></div>
+                                                    <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className={`px-6 py-5 text-xs font-black border-b cursor-pointer flex justify-between transition-all ${darkMode ? 'border-white/5 hover:bg-blue-600 text-slate-200' : 'border-slate-100 hover:bg-slate-50 text-black'}`}><span>{a}</span><span className="opacity-30">SELECIONAR</span></div>
                                                 ))}
                                             </div>
                                         </div>
@@ -282,104 +279,111 @@
                                 </section>
 
                                 {items.map((it, idx) => (
-                                    <section key={idx} className="glass-dark p-8 rounded-[3.5rem] space-y-6 relative border-l-[12px] border-blue-600 shadow-2xl border border-white/5 text-left transition-all" style={{ zIndex: it.showList ? 200 : 5 }}>
-                                        {idx > 0 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} className="absolute top-6 right-6 text-red-500/40 hover:text-red-500 transition-all font-black text-[10px] uppercase tracking-widest"><Trash2 /></button>}
+                                    <section key={idx} className={`${darkMode ? 'glass-dark' : 'glass-light'} p-8 rounded-[3.5rem] space-y-6 relative border-l-[12px] border-blue-600 text-left transition-all`} style={{ zIndex: it.showList ? 200 : 5 }}>
+                                        {idx > 0 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} className="absolute top-6 right-6 text-red-500/60 hover:text-red-500 transition-all font-black text-[10px] uppercase">Remover</button>}
                                         <div className="space-y-2 relative">
-                                            <label className="text-[10px] font-black uppercase opacity-50 ml-2 tracking-widest block leading-none mb-1">Equipamento (TAG)</label>
+                                            <label className={`text-[10px] font-black uppercase tracking-widest block leading-none mb-1 ${darkMode ? 'text-slate-400' : 'text-black'}`}>Equipamento (TAG)</label>
                                             <div className="relative">
-                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600"><Building2 /></div>
+                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"><Building2 /></div>
                                                 <input 
                                                     type="text" 
                                                     placeholder={area ? `TAGS DA ÁREA ${area}...` : "BUSCAR TAG..."}
                                                     value={it.search} 
                                                     onFocus={() => { const n = [...items]; n[idx].showList = true; setItems(n); }} 
                                                     onChange={(e) => { const n = [...items]; n[idx].search = e.target.value.toUpperCase(); n[idx].showList = true; setItems(n); }} 
-                                                    className="w-full pl-12 pr-5 py-5 rounded-2xl border border-slate-800 bg-slate-950 outline-none font-black text-sm tracking-widest text-blue-400 placeholder-slate-800 shadow-inner" 
+                                                    className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black placeholder-slate-300 focus:border-blue-500'}`} 
                                                 />
                                             </div>
                                             {it.showList && (
-                                                <div className="select-window glass-dark rounded-2xl shadow-2xl border border-blue-500/30 overflow-hidden text-slate-300 uppercase">
-                                                    <div className="max-h-64 overflow-y-auto dropdown-scroll">
+                                                <div className={`select-window ${darkMode ? 'glass-dark' : 'bg-white border-slate-300'} border`}>
+                                                    <div className="max-h-64 overflow-y-auto dropdown-scroll uppercase">
                                                         {(area ? AREA_TAG_MAPPING[area] : EQUIPAMENTOS_ALL).filter(t => t.includes(it.search)).map(tag => (
-                                                            <div key={tag} onClick={() => { const n = [...items]; n[idx].tag = tag; n[idx].search = tag; n[idx].showList = false; n[idx].totalTag = String(EQUIPAMENTOS_TOTAIS[tag]); setItems(n); }} className="px-6 py-5 hover:bg-blue-600 text-xs font-bold border-b border-white/5 cursor-pointer flex justify-between uppercase text-white transition-all"><span>{tag}</span><span className="opacity-20 uppercase font-black text-[7px]">ESCOLHER</span></div>
+                                                            <div key={tag} onClick={() => { const n = [...items]; n[idx].tag = tag; n[idx].search = tag; n[idx].showList = false; n[idx].totalTag = String(EQUIPAMENTOS_TOTAIS[tag]); setItems(n); }} className={`px-6 py-5 text-xs font-bold border-b cursor-pointer flex justify-between transition-all ${darkMode ? 'border-white/5 hover:bg-blue-600 text-slate-200' : 'border-slate-100 hover:bg-slate-50 text-black'}`}><span>{tag}</span><span className="opacity-20 font-black text-[7px]">ESCOLHER</span></div>
                                                         ))}
                                                     </div>
                                                 </div>
                                             )}
                                         </div>
                                         <div className="grid grid-cols-3 gap-2">
-                                            <div className="space-y-1 text-center"><label className="text-[9px] font-black uppercase text-green-500 block mb-1">Limpos</label><input type="number" value={it.limpos} onChange={e => { const n = [...items]; n[idx].limpos = e.target.value; setItems(n); }} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-white border border-slate-900 shadow-inner outline-none placeholder-slate-900" placeholder="0" /></div>
-                                            <div className="space-y-1 text-center"><label className="text-[9px] font-black uppercase text-red-500 block mb-1 leading-none">Com Ferro</label><input type="number" value={it.ferro} onChange={e => { const n = [...items]; n[idx].ferro = e.target.value; setItems(n); }} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-red-500 border border-red-900/30 shadow-inner outline-none placeholder-red-950" placeholder="0" /></div>
-                                            <div className="space-y-1 text-center"><label className="text-[9px] font-black uppercase opacity-40 block mb-1 leading-none">Total Tubos</label><input type="number" value={it.totalTag} onChange={e => { const n = [...items]; n[idx].totalTag = e.target.value; setItems(n); }} className="w-full p-4 rounded-xl bg-slate-950 text-center font-black text-xl text-slate-500 border border-slate-900 outline-none" /></div>
+                                            <div className="flex flex-col items-center">
+                                                <label className={`text-[9px] font-black uppercase text-green-600 block mb-2`}>Limpos</label>
+                                                <input type="number" value={it.limpos} onChange={e => { const n = [...items]; n[idx].limpos = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-green-400' : 'bg-green-50 border-green-200 text-green-700 placeholder-green-200'}`} placeholder="0" />
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <label className={`text-[9px] font-black uppercase text-red-600 block mb-2 leading-none text-center`}>Com Ferro</label>
+                                                <input type="number" value={it.ferro} onChange={e => { const n = [...items]; n[idx].ferro = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-red-900/30 text-red-500' : 'bg-red-50 border-red-200 text-red-600 placeholder-red-200'}`} placeholder="0" />
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <label className={`text-[9px] font-black uppercase opacity-60 block mb-2 leading-none text-center ${darkMode ? 'text-slate-400' : 'text-black'}`}>Total Tubos</label>
+                                                <input type="number" value={it.totalTag} onChange={e => { const n = [...items]; n[idx].totalTag = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-slate-500' : 'bg-slate-100 border-slate-200 text-black'}`} />
+                                            </div>
                                         </div>
                                     </section>
                                 ))}
-                                <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false }])} className="w-full py-6 border-2 border-dashed border-blue-500/40 rounded-3xl text-blue-500 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all shadow-lg">+ Adicionar TAG</button>
+                                <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false }])} className={`w-full py-6 border-2 border-dashed rounded-3xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all ${darkMode ? 'border-blue-500/40 text-blue-500' : 'border-slate-300 text-slate-600 bg-white shadow-sm'}`}>+ Adicionar TAG</button>
                                 <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] active:scale-95 transition-all text-white font-black">{loading ? 'SINCRONIZANDO...' : 'Sincronizar Relatório'}</button>
                             </div>
                         )}
 
                         {view === 'history' && (
                             <div className="space-y-6 animate-pop pb-12">
-                                <div className="glass-dark p-4 rounded-[2.2rem] border border-white/5 space-y-4 shadow-xl text-left">
+                                <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-4 rounded-[2.2rem] space-y-4`}>
                                     <div className="flex gap-2 overflow-x-auto pb-2 hide-scroll no-scrollbar text-[9px] font-black uppercase tracking-widest">
                                         {[{l: 'Hoje', v: '0'}, {l: '3 Dias', v: '3'}, {l: '15 Dias', v: '15'}, {l: 'Personalizado', v: 'custom'}].map(f => (
-                                            <button key={f.v} onClick={() => setHistoryFilter(f.v)} className={`px-5 py-2.5 rounded-full whitespace-nowrap transition-all ${historyFilter === f.v ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-900 text-slate-500 border border-white/5'}`}>{f.l}</button>
+                                            <button key={f.v} onClick={() => setHistoryFilter(f.v)} className={`px-5 py-2.5 rounded-full whitespace-nowrap transition-all ${historyFilter === f.v ? 'bg-blue-600 text-white shadow-lg' : (darkMode ? 'bg-slate-900 text-slate-500 border border-white/5' : 'bg-slate-100 text-black')}`}>{f.l}</button>
                                         ))}
                                     </div>
                                     {historyFilter === 'custom' && (
-                                        <div className="grid grid-cols-2 gap-3 pt-1 border-t border-white/5 animate-pop">
-                                            <div className="space-y-1 text-left"><label className="text-[8px] font-black uppercase text-slate-500 ml-2">Início</label><input type="date" value={customDates.start} onChange={(e) => setCustomDates({...customDates, start: e.target.value})} className="w-full p-3 rounded-xl bg-slate-950 border border-white/10 text-[10px] font-bold text-blue-400 outline-none" /></div>
-                                            <div className="space-y-1 text-left"><label className="text-[8px] font-black uppercase text-slate-500 ml-2">Fim</label><input type="date" value={customDates.end} onChange={(e) => setCustomDates({...customDates, end: e.target.value})} className="w-full p-3 rounded-xl bg-slate-950 border border-white/10 text-[10px] font-bold text-blue-400 outline-none" /></div>
+                                        <div className={`grid grid-cols-2 gap-3 pt-1 border-t animate-pop ${darkMode ? 'border-white/5' : 'border-slate-100'}`}>
+                                            <div className="space-y-1 text-left"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Início</label><input type="date" value={customDates.start} onChange={(e) => setCustomDates({...customDates, start: e.target.value})} className={`w-full p-3 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400' : 'bg-white border-slate-300 text-black'}`} /></div>
+                                            <div className="space-y-1 text-left"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Fim</label><input type="date" value={customDates.end} onChange={(e) => setCustomDates({...customDates, end: e.target.value})} className={`w-full p-3 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400' : 'bg-white border-slate-300 text-black'}`} /></div>
                                         </div>
                                     )}
                                 </div>
                                 {filteredHistory.map(h => (
-                                    <div key={h.id} className="glass-dark p-8 rounded-[3.5rem] border border-white/5 shadow-2xl relative overflow-hidden text-left flex justify-between items-center group active:scale-95 transition-all border-l-4 border-l-blue-500">
-                                        <div className="space-y-1 text-left text-left">
-                                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none">{h.company}</p>
-                                            <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none">{h.items?.[0]?.tag}</h4>
-                                            <p className="text-[9px] font-bold opacity-30 uppercase flex items-center gap-2"><Clock size={10} /> {h.data} • {h.hora}</p>
+                                    <div key={h.id} className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-100'} p-8 rounded-[3.5rem] relative overflow-hidden text-left flex justify-between items-center active:scale-95 transition-all border-l-4 border-l-blue-600`}>
+                                        <div className="space-y-1 text-left">
+                                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">{h.company}</p>
+                                            <h4 className={`text-xl font-black uppercase tracking-tighter leading-none ${darkMode ? 'text-white' : 'text-black'}`}>{h.items?.[0]?.tag}</h4>
+                                            <p className={`text-[9px] font-bold uppercase flex items-center gap-2 ${darkMode ? 'opacity-40' : 'text-slate-600'}`}><Clock size={10} /> {h.data} • {h.hora}</p>
                                         </div>
-                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className="w-12 h-12 bg-green-500/10 text-green-500 rounded-2xl flex items-center justify-center border border-green-500/20 active:scale-90 shadow-lg"><IconWA /></button>
+                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${darkMode ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-green-600 text-white shadow-md shadow-green-200'}`}><IconWA /></button>
                                     </div>
                                 ))}
-                                {filteredHistory.length === 0 && <p className="text-center py-24 opacity-10 font-black uppercase tracking-[0.3em] text-[10px]">Nenhum registro encontrado</p>}
                             </div>
                         )}
 
                         {view === 'dash' && (
                             <div className="space-y-6 animate-pop">
-                                <section className="glass-dark p-10 rounded-[4.5rem] shadow-2xl border border-white/5 border-t-8 border-t-blue-600 relative overflow-hidden text-left">
-                                    <div className="flex justify-between items-end text-white">
+                                <section className={`${darkMode ? 'glass-dark' : 'bg-white shadow-lg border border-slate-200'} p-10 rounded-[4.5rem] border-t-8 border-t-blue-600 relative overflow-hidden text-left`}>
+                                    <div className="flex justify-between items-end">
                                         <div className="space-y-1 text-left">
-                                            <h2 className="text-6xl font-black tracking-tighter leading-none">{statsToday.l}</h2>
-                                            <p className="text-[11px] font-black opacity-30 uppercase tracking-[0.2em]">Tubos Hoje</p>
+                                            <h2 className={`text-6xl font-black tracking-tighter leading-none ${darkMode ? 'text-white' : 'text-black'}`}>{statsToday.l}</h2>
+                                            <p className={`text-[11px] font-black opacity-30 uppercase tracking-[0.2em] ${darkMode ? '' : 'text-black'}`}>Tubos Hoje</p>
                                         </div>
-                                        <div className="text-right"><p className="text-3xl font-black text-green-500">{statsToday.eff}%</p><p className="text-[8px] font-black opacity-30 uppercase leading-none tracking-widest">Eficiência</p></div>
+                                        <div className="text-right"><p className="text-3xl font-black text-green-500">{statsToday.eff}%</p><p className={`text-[8px] font-black opacity-30 uppercase leading-none tracking-widest ${darkMode ? '' : 'text-black'}`}>Eficiência</p></div>
                                     </div>
-                                    <div className="w-full h-5 bg-white/5 rounded-full overflow-hidden p-1 border border-white/5 mt-8"><div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.6)]" style={{ width: `${statsToday.eff}%` }}></div></div>
+                                    <div className={`w-full h-5 rounded-full overflow-hidden p-1 border mt-8 ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}><div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.6)]" style={{ width: `${statsToday.eff}%` }}></div></div>
                                 </section>
-                                <div className="grid grid-cols-2 gap-4 uppercase font-black text-[8px] tracking-widest text-slate-500">
-                                    <div className="glass-dark p-10 rounded-[3rem] text-center border border-white/5 shadow-xl transition-all"><p className="text-3xl font-black text-white">{history.length}</p><p className="mt-2 uppercase">Relatórios</p></div>
-                                    <div className="glass-dark p-10 rounded-[3rem] text-center border border-white/5 shadow-xl transition-all leading-none"><p className="text-xl font-black text-blue-500 tracking-tighter leading-none">{history[0]?.company || '--'}</p><p className="mt-2 uppercase leading-none">Unidade</p></div>
+                                <div className="grid grid-cols-2 gap-4 uppercase font-black text-[8px] tracking-widest">
+                                    <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-10 rounded-[3rem] text-center transition-all`}><p className={`text-3xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{history.length}</p><p className={`mt-2 opacity-30 uppercase ${darkMode ? '' : 'text-black'}`}>Relatórios</p></div>
+                                    <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-10 rounded-[3rem] text-center transition-all leading-none`}><p className={`text-xl font-black text-blue-600 tracking-tighter leading-none`}>{history[0]?.company || '--'}</p><p className={`mt-2 opacity-30 uppercase leading-none ${darkMode ? '' : 'text-black'}`}>Unidade</p></div>
                                 </div>
                             </div>
                         )}
                     </main>
 
-                    {/* NAV BAR PREMIUM COM BOTÃO CENTRAL DE REGISTO */}
-                    <nav className="fixed bottom-0 left-0 right-0 glass-dark border-t border-white/10 p-6 flex justify-around items-center rounded-t-[5.5rem] z-[250] shadow-[0_-30px_90px_rgba(0,0,0,0.8)] backdrop-blur-3xl bg-slate-950/90">
-                        <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 transition-all duration-300 ${view === 'history' ? 'text-blue-500 scale-110' : 'text-slate-600 opacity-40 hover:opacity-100'}`}>
+                    <nav className={`fixed bottom-0 left-0 right-0 border-t p-6 flex justify-around items-center rounded-t-[5.5rem] z-[150] shadow-[0_-15px_60px_rgba(0,0,0,0.1)] backdrop-blur-3xl transition-all duration-300 ${darkMode ? 'glass-dark border-white/10 bg-slate-950/90' : 'bg-white border-slate-200 shadow-2xl'}`}>
+                        <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 transition-all duration-300 ${view === 'history' ? 'text-blue-600 scale-110' : (darkMode ? 'text-slate-400 opacity-60' : 'text-slate-600')}`}>
                             <IconHistory />
                             <span className="text-[8px] font-black uppercase tracking-widest text-[7px]">Registos</span>
                         </button>
                         
-                        <button onClick={() => setView('form')} className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 center-btn ${view === 'form' ? 'bg-blue-600 text-white scale-110' : 'bg-slate-800 text-slate-400'}`}>
+                        <button onClick={() => setView('form')} className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 center-btn ${view === 'form' ? 'bg-blue-600 text-white scale-110' : (darkMode ? 'bg-slate-800 text-slate-400 border-[#0f172a]' : 'bg-slate-50 text-slate-500 border-slate-200 shadow-inner')}`}>
                             <IconPlus />
                         </button>
 
-                        <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-1 transition-all duration-300 ${view === 'dash' ? 'text-blue-500 scale-110' : 'text-slate-600 opacity-40 hover:opacity-100'}`}>
+                        <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-1 transition-all duration-300 ${view === 'dash' ? 'text-blue-600 scale-110' : (darkMode ? 'text-slate-400 opacity-60' : 'text-slate-600')}`}>
                             <IconDashboard />
                             <span className="text-[8px] font-black uppercase tracking-widest text-[7px]">Painel</span>
                         </button>
