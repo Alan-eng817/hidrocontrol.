@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="google" content="notranslate">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HidroControl App 3.0 - Alumar</title>
+    <title>HidroControl App 3.5 - Alumar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -16,56 +16,37 @@
         import { getFirestore, collection, addDoc, query, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Disponibiliza o Firebase para o script Babel
+        // Disponibiliza o Firebase para o Babel
         window.FB_CORE = { initializeApp, getFirestore, collection, addDoc, query, onSnapshot, getAuth, signInAnonymously, onAuthStateChanged, signOut };
     </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; transition: background-color 0.3s ease; }
-        
-        /* Glassmorphism Dinâmico */
         .glass-dark { background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(24px); }
         .glass-light { background: rgba(255, 255, 255, 1); border: 1px solid rgba(0, 0, 0, 0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
-        
         .animate-pop { animation: fadeIn 0.25s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
         .dropdown-scroll::-webkit-scrollbar { width: 6px; }
         .dropdown-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
         .hide-scroll::-webkit-scrollbar { display: none; }
         
-        /* Botão Central Premium Industrial */
-        .center-btn {
-            transform: translateY(-28px);
-            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.45);
-            z-index: 100;
-        }
+        .center-btn { transform: translateY(-28px); box-shadow: 0 12px 40px rgba(59, 130, 246, 0.45); z-index: 100; transition: all 0.3s ease; }
         .center-btn:active { transform: translateY(-24px) scale(0.92); }
         
-        /* Janelas de Seleção Corrigidas (Z-Index Máximo) */
-        .select-window {
-            position: absolute;
-            left: 0;
-            right: 0;
-            top: 100%;
-            z-index: 999 !important;
-            margin-top: 8px;
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
-            border-radius: 1.5rem;
-            overflow: hidden;
-        }
-
-        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; }
+        .select-window { position: absolute; left: 0; right: 0; top: 100%; z-index: 999 !important; margin-top: 8px; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25); border-radius: 1.5rem; overflow: hidden; }
+        
+        /* Dashboard Sticky Fix */
+        .dashboard-header-fixed { position: sticky; top: -24px; z-index: 150; margin-bottom: 20px; }
     </style>
 </head>
-<body class="overflow-x-hidden hide-scroll">
+<body class="overflow-x-hidden hide-scroll bg-slate-950">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
-        // --- COMPONENTES DE ÍCONES ---
+        // --- COMPONENTES DE ÍCONES (DEFINIÇÃO MANUAL PARA ESTABILIDADE) ---
         const Clock = ({ size = 18 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
         const IconHistory = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
         const IconDashboard = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
@@ -75,6 +56,11 @@
         const MapPin = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>;
         const Building2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><path d="M7 22V13h10v9M2 8h20M2 14h20M7 8v5M17 8v5"/></svg>;
         const Trash2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>;
+        const DatabaseIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>;
+        const DownloadIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>;
+        const IconShield = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+        const IconAlert = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
+        const Send = ({ size = 18 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
 
         const firebaseConfig = {
             apiKey: "AIzaSyAPM1NNw9PazMccz5kxZjFAqOYKLqQwLxo",
@@ -90,12 +76,7 @@
             "030I": ["030-TC-001", "030-TC-002", "030-TC-003", "030-TC-004", "030-TC-005", "030-TC-006", "030-TC-007", "030-TC-008", "030-TC-009", "030-TC-010", "030-TC-019", "030-TC-11A", "030-TC-11B", "030-TC-11C", "030-TC-11D", "030-TC-11E", "030-TC-11F", "030-TC-12A", "030-TC-12B", "030-TC-12C", "030-TC-12D", "030-TC-12E", "030-TC-12F", "030-TC-13A", "030-TC-13B", "030-TC-13C", "030-TC-13D", "030-TC-13E", "030-TC-13F", "030-TC-17A", "030-TC-17B", "030-TC-17C", "030-TC-17D", "030-TC-17E", "030-TC-17F", "030-TC-18A", "030-TC-18B", "030-TC-18C", "030-TC-18D", "030-TC-18E", "030-TC-18F"],
             "030II": ["030-TC-029", "030-TC-21A", "030-TC-21B", "030-TC-22A", "030-TC-22B", "030-TC-22C", "030-TC-22D", "030-TC-23A", "030-TC-23B", "030-TC-23C", "030-TC-23D", "030-TC-24A", "030-TC-24B", "030-TC-24C", "030-TC-24D", "030-TC-25A", "030-TC-25B", "030-TC-25C", "030-TC-25D", "030-TC-26A", "030-TC-26B", "030-TC-26C", "030-TC-26D", "030-TC-26E", "030-TC-26F", "030-TC-31A", "030-TC-31B", "030-TC-32A", "030-TC-32B", "030-TC-32C", "030-TC-32D", "030-TC-33A", "030-TC-33B", "030-TC-33C", "030-TC-33D", "030-TC-34A", "030-TC-34B", "030-TC-34C", "030-TC-34D", "030-TC-35A", "030-TC-35B", "030-TC-35C", "030-TC-35D", "030-TC-36A", "030-TC-36B", "030-TC-36C", "030-TC-36D", "030-TC-36E", "030-TC-36F", "030-TC-41A", "030-TC-41B", "030-TC-42A", "030-TC-42B", "030-TC-42C", "030-TC-42D", "030-TC-43A", "030-TC-43B", "030-TC-43C", "030-TC-43D", "030-TC-44A", "030-TC-44B", "030-TC-44C", "030-TC-44D", "030-TC-45A", "030-TC-45B", "030-TC-45C", "030-TC-45D", "030-TC-46A", "030-TC-46B", "030-TC-46C", "030-TC-46D", "030-TC-46E", "030-TC-46F"],
             "040I": ["040-TC-011", "040-TC-012", "040-TC-013", "040-TC-014", "040-TC-015"],
-            "040II": ["040-TC-021", "040-TC-022", "040-TC-023", "040-TC-024", "040-TC-025"],
-            "040III": ["040-TC-031", "040-TC-032", "040-TC-033", "040-TC-034", "040-TC-035"],
-            "040K": ["040K-TC-011"],
-            "042I": ["042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015", "042-TC-016", "042-TC-017", "042-TC-018", "042-TC-019"],
-            "042II": ["042-TC-021", "042-TC-022", "042-TC-023", "042-TC-024", "042-TC-025", "042-TC-026", "042-TC-027", "042-TC-028", "042-TC-029"],
-            "042III": ["042-TC-031", "042-TC-032", "042-TC-033", "042-TC-034", "042-TC-035", "042-TC-036", "042-TC-037", "042-TC-038", "042-TC-039"]
+            "042I": ["042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015", "042-TC-016", "042-TC-017", "042-TC-018", "042-TC-019"]
         };
 
         const EQUIPAMENTOS_TOTAIS = {
@@ -105,12 +86,12 @@
             "030-TC-001": 600, "030-TC-019": 600, "030-TC-029": 600,
             ...Object.fromEntries(["030-TC-002", "030-TC-003", "030-TC-004", "030-TC-005", "030-TC-006", "030-TC-007", "030-TC-008"].map(t=>[t, 880])),
             "030-TC-009": 1000, "030-TC-010": 1000,
-            ...Object.fromEntries(["040-TC-011", "040-TC-012", "040-TC-013", "040-TC-014", "040-TC-015", "040-TC-021", "040-TC-022", "040-TC-023", "040-TC-024", "040-TC-025", "040-TC-031", "040-TC-032", "040-TC-033", "040-TC-034", "040-TC-035", "040K-TC-011"].map(t=>[t, 1000])),
-            ...Object.fromEntries(["042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015", "042-TC-016", "042-TC-017", "042-TC-018", "042-TC-019", "042-TC-021", "042-TC-022", "042-TC-023", "042-TC-024", "042-TC-025", "042-TC-026", "042-TC-027", "042-TC-028", "042-TC-029", "042-TC-031", "042-TC-032", "042-TC-033", "042-TC-034", "042-TC-035", "042-TC-036", "042-TC-037", "042-TC-038", "042-TC-039"].map(t=>[t, 1000]))
+            ...Object.fromEntries(["040-TC-011", "040-TC-012", "040-TC-013", "040-TC-014", "040-TC-015"].map(t=>[t, 1000])),
+            ...Object.fromEntries(["042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015", "042-TC-016", "042-TC-017", "042-TC-018", "042-TC-019"].map(t=>[t, 1000]))
         };
 
-        const EQUIPAMENTOS_ALL = Object.keys(EQUIPAMENTOS_TOTAIS);
         const AREAS_LISTA = Object.keys(AREA_TAG_MAPPING);
+        const EQUIPAMENTOS_ALL = Object.keys(EQUIPAMENTOS_TOTAIS);
 
         const App = () => {
             const [user, setUser] = useState(null);
@@ -119,14 +100,16 @@
             const [loading, setLoading] = useState(false);
             const [darkMode, setDarkMode] = useState(true);
             const [historyFilter, setHistoryFilter] = useState('0');
-            const [customDates, setCustomDates] = useState({ start: '', end: '' });
+            const [dateRange, setDateRange] = useState({ start: '', end: '' });
+            const [isSynced, setIsSynced] = useState(false);
             
+            const [regType, setRegType] = useState('producao'); 
             const [company, setCompany] = useState('MONTISOL');
             const [turno, setTurno] = useState('ADM');
             const [area, setArea] = useState('');
             const [areaSearch, setAreaSearch] = useState('');
             const [showAreaList, setShowAreaList] = useState(false);
-            const [items, setItems] = useState([{ tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false }]);
+            const [items, setItems] = useState([{ tag: '', limpos: '', ferro: '', obstruidos: '', tamponados: '', totalTag: '180', search: '', showList: false }]);
 
             // --- FIREBASE SYNC ---
             useEffect(() => {
@@ -137,17 +120,14 @@
                         const app = fb.initializeApp(firebaseConfig);
                         const auth = fb.getAuth(app);
                         const db = fb.getFirestore(app);
-                        
                         fb.onAuthStateChanged(auth, (u) => {
                             if (u) {
                                 setUser(u);
                                 fb.onSnapshot(fb.collection(db, 'artifacts', 'hidrocontrol-alumar', 'public', 'data', 'registos'), (snap) => {
-                                    const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                                    setHistory(data.sort((a,b) => b.ts - a.ts));
+                                    setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => b.ts - a.ts));
+                                    setIsSynced(true);
                                 });
-                            } else {
-                                fb.signInAnonymously(auth).catch(e => console.error("Login Fail", e));
-                            }
+                            } else { fb.signInAnonymously(auth); }
                         });
                     }
                 }, 100);
@@ -155,29 +135,34 @@
             }, []);
 
             const filteredHistory = useMemo(() => {
-                const now = Date.now();
                 const todayStr = new Date().toLocaleDateString('pt-BR');
                 return history.filter(h => {
-                    if (historyFilter === 'custom') {
-                        if (!customDates.start || !customDates.end) return true;
-                        const hDate = new Date(h.ts);
-                        const sDate = new Date(customDates.start + 'T00:00:00');
-                        const eDate = new Date(customDates.end + 'T23:59:59');
-                        return hDate >= sDate && hDate <= eDate;
-                    }
                     if (historyFilter === '0') return h.data === todayStr;
-                    const daysMs = parseInt(historyFilter) * 24 * 60 * 60 * 1000;
-                    return (now - h.ts) <= daysMs;
+                    if (historyFilter === 'custom' && dateRange.start && dateRange.end) {
+                        const hDate = new Date(h.ts);
+                        return hDate >= new Date(dateRange.start) && hDate <= new Date(dateRange.end + 'T23:59:59');
+                    }
+                    const days = parseInt(historyFilter);
+                    return (Date.now() - h.ts) <= (days * 24 * 60 * 60 * 1000);
                 });
-            }, [history, historyFilter, customDates]);
+            }, [history, historyFilter, dateRange]);
 
-            const statsToday = useMemo(() => {
+            // --- MÉTRICAS DO PAINEL 3.5 ---
+            const stats = useMemo(() => {
                 const todayStr = new Date().toLocaleDateString('pt-BR');
-                const tData = history.filter(h => h.data === todayStr);
-                const l = tData.reduce((acc, r) => acc + (r.items || []).reduce((a,i) => a + Number(i.limpos || 0), 0), 0);
-                const t = tData.reduce((acc, r) => acc + (r.items || []).reduce((a,i) => a + Number(i.totalTag || 0), 0), 1);
-                return { l, eff: ((l / (t || 1)) * 100).toFixed(1) };
-            }, [history]);
+                const todayData = history.filter(h => h.data === todayStr);
+                
+                const curShiftProd = todayData
+                    .filter(h => h.turno === turno && h.type === 'producao')
+                    .reduce((acc, curr) => acc + curr.items.reduce((a, i) => a + Number(i.limpos || 0), 0), 0);
+
+                const totalLimposAcumulado = history.filter(h => h.type === 'producao').reduce((acc, curr) => acc + curr.items.reduce((a, i) => a + Number(i.limpos || 0), 0), 0);
+                const totalObstruidosAcumulado = history.filter(h => h.type === 'mapeamento').reduce((acc, curr) => acc + curr.items.reduce((a, i) => a + Number(i.obstruidos || 0), 0), 0);
+                const totalTamponadosAcumulado = history.filter(h => h.type === 'mapeamento').reduce((acc, curr) => acc + curr.items.reduce((a, i) => a + Number(i.tamponados || 0), 0), 0);
+                const totalMapeados = totalObstruidosAcumulado + totalTamponadosAcumulado;
+
+                return { curShiftProd, totalLimposAcumulado, totalMapeados, totalTamponadosAcumulado, totalObstruidosAcumulado };
+            }, [history, turno]);
 
             const updateItem = (idx, field, val) => {
                 const newItems = [...items];
@@ -193,85 +178,105 @@
                 setLoading(true);
                 try {
                     const fb = window.FB_CORE;
-                    const db = fb.getFirestore();
                     const docData = {
                         data: new Date().toLocaleDateString('pt-BR'),
                         hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
                         ts: Date.now(),
+                        type: regType,
                         company, turno, area,
                         user: user.uid,
-                        items: items.map(i => ({ tag: i.tag, limpos: i.limpos, ferro: i.ferro || 0, totalTag: i.totalTag }))
+                        items: items.map(i => ({ ...i, showList: false, search: '' }))
                     };
-                    await fb.addDoc(fb.collection(db, 'artifacts', 'hidrocontrol-alumar', 'public', 'data', 'registos'), docData);
+                    await fb.addDoc(fb.collection(fb.getFirestore(), 'artifacts', 'hidrocontrol-alumar', 'public', 'data', 'registos'), docData);
                     setView('success');
-                } catch (e) { console.error("Save Error", e); }
+                } catch (e) { console.error(e); }
                 setLoading(false);
             };
 
-            const getWhatsAppLink = (reg) => {
-                const msg = `*HIDROJATO - ${reg.company}*%0A📍 *Área:* ${reg.area}%0A✅ Tubos Limpos: ${reg.items?.[0]?.limpos || 0}%0A⚠️ Ferro: ${reg.items?.[0]?.ferro || 0}`;
-                return `https://wa.me/?text=${msg}`;
+            const handleExportCSV = () => {
+                let csv = "Data,Hora,Tipo,Empresa,Turno,Area,TAG,Limpos,Obstruidos,Tamponados,Ferro,Total\n";
+                history.forEach(h => {
+                    h.items.forEach(i => {
+                        csv += `${h.data},${h.hora},${h.type},${h.company},${h.turno},${h.area},${i.tag},${i.limpos || 0},${i.obstruidos || 0},${i.tamponados || 0},${i.ferro || 0},${i.totalTag}\n`;
+                    });
+                });
+                const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: "text/csv;charset=utf-8;" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `HidroControl_Alumar_BaseMaster_3.5.csv`;
+                link.click();
             };
 
-            if (!user) return (
-                <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-                    <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-            );
+            const getWhatsAppLink = (reg) => {
+                const isMap = reg.type === 'mapeamento';
+                let msg = `*HIDROJATO ALUMAR 3.5 - ${reg.company}*%0A` +
+                          `📍 *Área:* ${reg.area} | *Turno:* ${reg.turno}%0A` +
+                          `📌 *Tipo:* ${isMap ? 'MAPEAMENTO INICIAL' : 'PRODUÇÃO'}%0A%0A`;
+                
+                reg.items.forEach(i => {
+                    msg += `🛠️ *TAG:* ${i.tag}%0A` +
+                           (isMap ? `❌ Obstruídos: ${i.obstruidos}%0A🔒 Tamponados: ${i.tamponados}%0A` : 
+                                    `✅ Limpos: ${i.limpos}%0A⚠️ Ferro: ${i.ferro}%0A`) +
+                           `📊 Total: ${i.totalTag}%0A---%0A`;
+                });
+                return `https://wa.me/?text=${msg}`;
+            };
 
             return (
                 <div className={`min-h-screen flex flex-col max-w-lg mx-auto transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-black'}`}>
                     
                     {view === 'success' && (
-                        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-pop text-center">
+                        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-pop text-center text-white">
                             <div className={`${darkMode ? 'glass-dark' : 'glass-light shadow-2xl'} w-full max-w-sm p-12 rounded-[4rem] space-y-8`}>
                                 <IconCheck className="mx-auto" />
                                 <h2 className={`text-2xl font-black uppercase italic tracking-tighter ${darkMode ? 'text-white' : 'text-black'}`}>SINCRONIZADO!</h2>
-                                <button onClick={() => setView('history')} className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs active:scale-95 shadow-lg shadow-blue-600/30 text-white">Ver Registros</button>
+                                <button onClick={() => { setView('history'); }} className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs shadow-lg text-white">Ver Registros</button>
                             </div>
                         </div>
                     )}
 
-                    <header className={`p-6 flex justify-between items-center sticky top-0 z-50 backdrop-blur-3xl border-b transition-all ${darkMode ? 'border-white/5 bg-slate-950/80' : 'border-slate-200 bg-white/90 shadow-sm'}`}>
+                    <header className={`p-6 flex justify-between items-center sticky top-0 z-[200] backdrop-blur-3xl border-b transition-all ${darkMode ? 'border-white/5 bg-slate-950/80' : 'border-slate-200 bg-white/90'}`}>
                         <div className="flex flex-col text-left">
                             <h1 className={`font-black text-2xl italic uppercase tracking-tighter leading-none ${darkMode ? 'text-blue-500' : 'text-blue-700'}`}>Hidro<span className={darkMode ? 'text-white' : 'text-black'}>Control</span></h1>
-                            <span className={`text-[9px] font-bold uppercase tracking-widest mt-1 ${darkMode ? 'opacity-40' : 'text-slate-600'}`}>ALUMAR PREMIUM v3.0</span>
+                            <div className="flex items-center gap-1.5 mt-1">
+                                <span className={`text-[9px] font-bold uppercase tracking-widest ${darkMode ? 'opacity-40' : 'text-slate-600'}`}>ALUMAR PREMIUM v3.5</span>
+                                {isSynced && <div className="text-green-500 animate-pulse"><DatabaseIcon /></div>}
+                            </div>
                         </div>
                         <button onClick={() => setDarkMode(!darkMode)} className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${darkMode ? 'border-white/10 bg-slate-900 text-white' : 'border-slate-300 bg-white text-black shadow-sm'}`}>{darkMode ? '☀️' : '🌙'}</button>
                     </header>
 
                     <main className="p-6 pb-48 space-y-6 overflow-y-auto hide-scroll">
                         {view === 'form' && (
-                            <div className="space-y-6 animate-pop">
+                            <div className="space-y-6 animate-pop text-left">
+                                <div className={`p-1.5 rounded-2xl flex gap-1 border ${darkMode ? 'bg-slate-900/40 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
+                                    <button onClick={() => setRegType('mapeamento')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${regType === 'mapeamento' ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-50'}`}>Mapeamento</button>
+                                    <button onClick={() => setRegType('producao')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${regType === 'producao' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-50'}`}>Produção</button>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-2">
                                     {['MONTISOL', 'CONSTEC'].map(c => (
-                                        <button key={c} onClick={() => setCompany(c)} className={`py-5 rounded-2xl font-black text-xs border transition-all ${company === c ? 'bg-blue-600 border-blue-400 text-white shadow-lg scale-[1.02]' : (darkMode ? 'bg-slate-900/50 border-white/5 text-slate-500' : 'bg-white border-slate-200 text-slate-900 shadow-sm')}`}>{c}</button>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {['ADM', 'T.C', 'T.A'].map(t => (
-                                        <button key={t} onClick={() => setTurno(t)} className={`py-4 rounded-2xl font-black text-xs border transition-all ${turno === t ? 'bg-blue-600 border-blue-400 text-white shadow-lg' : (darkMode ? 'bg-slate-900/50 border-white/5 text-slate-500' : 'bg-white border-slate-200 text-slate-900 shadow-sm')}`}>{t}</button>
+                                        <button key={c} onClick={() => setCompany(c)} className={`py-4 rounded-xl font-black text-[10px] border transition-all ${company === c ? 'bg-blue-600 text-white border-blue-400 shadow-md' : (darkMode ? 'bg-slate-900/50 border-white/5 text-slate-500' : 'bg-white border-slate-200 text-slate-900 shadow-sm')}`}>{c}</button>
                                     ))}
                                 </div>
 
-                                <section className={`${darkMode ? 'glass-dark' : 'glass-light'} p-8 rounded-[2.5rem] relative text-left`} style={{ zIndex: showAreaList ? 300 : 10 }}>
+                                <div className="grid grid-cols-3 gap-2">
+                                    {['ADM', 'T.C', 'T.A'].map(t => (
+                                        <button key={t} onClick={() => setTurno(t)} className={`py-4 rounded-xl font-black text-[10px] border transition-all ${turno === t ? 'bg-blue-600 border-blue-400 text-white shadow-md' : (darkMode ? 'bg-slate-900/50 border-white/5 text-slate-500' : 'bg-white border-slate-200 text-slate-900 shadow-sm')}`}>{t}</button>
+                                    ))}
+                                </div>
+
+                                <section className={`${darkMode ? 'glass-dark' : 'glass-light shadow-sm'} p-8 rounded-[2.5rem] relative`} style={{ zIndex: showAreaList ? 300 : 10 }}>
                                     <label className={`text-[10px] font-black uppercase mb-2 block tracking-widest ${darkMode ? 'text-slate-400' : 'text-black'}`}>Área Operacional</label>
                                     <div className="relative">
                                         <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"><MapPin /></div>
-                                        <input 
-                                            type="text" 
-                                            placeholder="BUSCAR ÁREA..." 
-                                            value={areaSearch} 
-                                            onFocus={() => setShowAreaList(true)} 
-                                            onChange={(e) => { setAreaSearch(e.target.value.toUpperCase()); setShowAreaList(true); }} 
-                                            className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black placeholder-slate-300 focus:border-blue-500'}`} 
-                                        />
+                                        <input type="text" placeholder="BUSCAR ÁREA..." value={areaSearch} onFocus={() => setShowAreaList(true)} onChange={(e) => { setAreaSearch(e.target.value.toUpperCase()); setShowAreaList(true); }} className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black focus:border-blue-500'}`} />
                                     </div>
                                     {showAreaList && (
                                         <div className={`select-window ${darkMode ? 'glass-dark' : 'bg-white border-slate-300'} border`}>
                                             <div className="max-h-64 overflow-y-auto dropdown-scroll uppercase">
                                                 {AREAS_LISTA.filter(a => a.includes(areaSearch)).map(a => (
-                                                    <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className={`px-6 py-5 text-xs font-black border-b cursor-pointer flex justify-between transition-all ${darkMode ? 'border-white/5 hover:bg-blue-600 text-slate-200' : 'border-slate-100 hover:bg-slate-50 text-black'}`}><span>{a}</span><span className="opacity-30">SELECIONAR</span></div>
+                                                    <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className={`px-6 py-5 text-xs font-black border-b cursor-pointer flex justify-between transition-all ${darkMode ? 'border-white/5 hover:bg-blue-600 text-slate-200' : 'border-slate-100 hover:bg-slate-50 text-black'}`}><span>{a}</span><span className="opacity-30 text-[8px]">SELECIONAR</span></div>
                                                 ))}
                                             </div>
                                         </div>
@@ -279,40 +284,49 @@
                                 </section>
 
                                 {items.map((it, idx) => (
-                                    <section key={idx} className={`${darkMode ? 'glass-dark' : 'glass-light'} p-8 rounded-[3.5rem] space-y-6 relative border-l-[12px] border-blue-600 text-left transition-all`} style={{ zIndex: it.showList ? 200 : 5 }}>
-                                        {idx > 0 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} className="absolute top-6 right-6 text-red-500/60 hover:text-red-500 transition-all font-black text-[10px] uppercase">Remover</button>}
+                                    <section key={idx} className={`${darkMode ? 'glass-dark' : 'glass-light shadow-sm'} p-8 rounded-[3.5rem] space-y-6 relative border-l-[12px] ${regType === 'mapeamento' ? 'border-amber-500' : 'border-blue-600'} transition-all`} style={{ zIndex: it.showList ? 200 : 5 }}>
+                                        {idx > 0 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} className="absolute top-6 right-6 text-red-500/60 hover:text-red-500 transition-all font-black text-[10px] uppercase tracking-widest">Remover</button>}
                                         <div className="space-y-2 relative">
                                             <label className={`text-[10px] font-black uppercase tracking-widest block leading-none mb-1 ${darkMode ? 'text-slate-400' : 'text-black'}`}>Equipamento (TAG)</label>
                                             <div className="relative">
                                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"><Building2 /></div>
-                                                <input 
-                                                    type="text" 
-                                                    placeholder={area ? `TAGS DA ÁREA ${area}...` : "BUSCAR TAG..."}
-                                                    value={it.search} 
-                                                    onFocus={() => { const n = [...items]; n[idx].showList = true; setItems(n); }} 
-                                                    onChange={(e) => { const n = [...items]; n[idx].search = e.target.value.toUpperCase(); n[idx].showList = true; setItems(n); }} 
-                                                    className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black placeholder-slate-300 focus:border-blue-500'}`} 
-                                                />
+                                                <input type="text" placeholder={area ? `TAGS DA ÁREA ${area}...` : "BUSCAR TAG..."} value={it.search} onFocus={() => { const n = [...items]; n[idx].showList = true; setItems(n); }} onChange={(e) => { const n = [...items]; n[idx].search = e.target.value.toUpperCase(); n[idx].showList = true; setItems(n); }} className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black focus:border-blue-500 shadow-inner'}`} />
                                             </div>
                                             {it.showList && (
                                                 <div className={`select-window ${darkMode ? 'glass-dark' : 'bg-white border-slate-300'} border`}>
                                                     <div className="max-h-64 overflow-y-auto dropdown-scroll uppercase">
                                                         {(area ? AREA_TAG_MAPPING[area] : EQUIPAMENTOS_ALL).filter(t => t.includes(it.search)).map(tag => (
-                                                            <div key={tag} onClick={() => { const n = [...items]; n[idx].tag = tag; n[idx].search = tag; n[idx].showList = false; n[idx].totalTag = String(EQUIPAMENTOS_TOTAIS[tag]); setItems(n); }} className={`px-6 py-5 text-xs font-bold border-b cursor-pointer flex justify-between transition-all ${darkMode ? 'border-white/5 hover:bg-blue-600 text-slate-200' : 'border-slate-100 hover:bg-slate-50 text-black'}`}><span>{tag}</span><span className="opacity-20 font-black text-[7px]">ESCOLHER</span></div>
+                                                            <div key={tag} onClick={() => { updateItem(idx, 'tag', tag); updateItem(idx, 'search', tag); updateItem(idx, 'showList', false); }} className={`px-6 py-5 text-xs font-bold border-b cursor-pointer flex justify-between transition-all ${darkMode ? 'border-white/5 hover:bg-blue-600 text-slate-200' : 'border-slate-100 hover:bg-slate-50 text-black'}`}><span>{tag}</span><span className="opacity-20 font-black text-[7px]">ESCOLHER</span></div>
                                                         ))}
                                                     </div>
                                                 </div>
                                             )}
                                         </div>
+                                        
                                         <div className="grid grid-cols-3 gap-2">
-                                            <div className="flex flex-col items-center">
-                                                <label className={`text-[9px] font-black uppercase text-green-600 block mb-2`}>Limpos</label>
-                                                <input type="number" value={it.limpos} onChange={e => { const n = [...items]; n[idx].limpos = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-green-400' : 'bg-green-50 border-green-200 text-green-700 placeholder-green-200'}`} placeholder="0" />
-                                            </div>
-                                            <div className="flex flex-col items-center">
-                                                <label className={`text-[9px] font-black uppercase text-red-600 block mb-2 leading-none text-center`}>Com Ferro</label>
-                                                <input type="number" value={it.ferro} onChange={e => { const n = [...items]; n[idx].ferro = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-red-900/30 text-red-500' : 'bg-red-50 border-red-200 text-red-600 placeholder-red-200'}`} placeholder="0" />
-                                            </div>
+                                            {regType === 'mapeamento' ? (
+                                                <React.Fragment>
+                                                    <div className="flex flex-col items-center">
+                                                        <label className="text-[9px] font-black uppercase text-amber-600 block mb-2 text-center leading-none">Obstruídos</label>
+                                                        <input type="number" value={it.obstruidos} onChange={e => { const n = [...items]; n[idx].obstruidos = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-700'}`} placeholder="0" />
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <label className={`text-[9px] font-black uppercase block mb-2 text-center leading-none ${darkMode ? 'text-slate-400' : 'text-black'}`}>Tamponados</label>
+                                                        <input type="number" value={it.tamponados} onChange={e => { const n = [...items]; n[idx].tamponados = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-slate-300' : 'bg-slate-50 border-slate-200 text-black'}`} placeholder="0" />
+                                                    </div>
+                                                </React.Fragment>
+                                            ) : (
+                                                <React.Fragment>
+                                                    <div className="flex flex-col items-center">
+                                                        <label className="text-[9px] font-black uppercase text-green-600 block mb-2 leading-none text-center">Limpos</label>
+                                                        <input type="number" value={it.limpos} onChange={e => { const n = [...items]; n[idx].limpos = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-green-400' : 'bg-green-50 border-green-200 text-green-700'}`} placeholder="0" />
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <label className="text-[9px] font-black uppercase text-red-600 block mb-2 leading-none text-center">Com Ferro</label>
+                                                        <input type="number" value={it.ferro} onChange={e => { const n = [...items]; n[idx].ferro = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-red-900/30 text-red-500' : 'bg-red-50 border-red-200 text-red-600'}`} placeholder="0" />
+                                                    </div>
+                                                </React.Fragment>
+                                            )}
                                             <div className="flex flex-col items-center">
                                                 <label className={`text-[9px] font-black uppercase opacity-60 block mb-2 leading-none text-center ${darkMode ? 'text-slate-400' : 'text-black'}`}>Total Tubos</label>
                                                 <input type="number" value={it.totalTag} onChange={e => { const n = [...items]; n[idx].totalTag = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-slate-500' : 'bg-slate-100 border-slate-200 text-black'}`} />
@@ -320,13 +334,13 @@
                                         </div>
                                     </section>
                                 ))}
-                                <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', totalTag: '180', search: '', showList: false }])} className={`w-full py-6 border-2 border-dashed rounded-3xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all ${darkMode ? 'border-blue-500/40 text-blue-500' : 'border-slate-300 text-slate-600 bg-white shadow-sm'}`}>+ Adicionar TAG</button>
-                                <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] active:scale-95 transition-all text-white font-black">{loading ? 'SINCRONIZANDO...' : 'Sincronizar Relatório'}</button>
+                                <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', obstruidos: '', tamponados: '', totalTag: '180', search: '', showList: false }])} className={`w-full py-6 border-2 border-dashed rounded-3xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all ${darkMode ? 'border-blue-500/40 text-blue-500' : 'border-slate-300 text-slate-600 bg-white shadow-sm'}`}>+ Adicionar TAG</button>
+                                <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] active:scale-95 transition-all text-white font-black">{loading ? 'SINCRONIZANDO...' : 'Sincronizar com Alumar Cloud'}</button>
                             </div>
                         )}
 
                         {view === 'history' && (
-                            <div className="space-y-6 animate-pop pb-12">
+                            <div className="space-y-6 animate-pop pb-12 text-left">
                                 <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-4 rounded-[2.2rem] space-y-4`}>
                                     <div className="flex gap-2 overflow-x-auto pb-2 hide-scroll no-scrollbar text-[9px] font-black uppercase tracking-widest">
                                         {[{l: 'Hoje', v: '0'}, {l: '3 Dias', v: '3'}, {l: '15 Dias', v: '15'}, {l: 'Personalizado', v: 'custom'}].map(f => (
@@ -335,54 +349,98 @@
                                     </div>
                                     {historyFilter === 'custom' && (
                                         <div className={`grid grid-cols-2 gap-3 pt-1 border-t animate-pop ${darkMode ? 'border-white/5' : 'border-slate-100'}`}>
-                                            <div className="space-y-1 text-left"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Início</label><input type="date" value={customDates.start} onChange={(e) => setCustomDates({...customDates, start: e.target.value})} className={`w-full p-3 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400' : 'bg-white border-slate-300 text-black'}`} /></div>
-                                            <div className="space-y-1 text-left"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Fim</label><input type="date" value={customDates.end} onChange={(e) => setCustomDates({...customDates, end: e.target.value})} className={`w-full p-3 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400' : 'bg-white border-slate-300 text-black'}`} /></div>
+                                            <div className="space-y-1 text-left"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Início</label><input type="date" value={dateRange.start} onChange={(e) => setDateRange({...dateRange, start: e.target.value})} className={`w-full p-3 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400' : 'bg-white border-slate-300 text-black'}`} /></div>
+                                            <div className="space-y-1 text-left"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Fim</label><input type="date" value={dateRange.end} onChange={(e) => setDateRange({...dateRange, end: e.target.value})} className={`w-full p-3 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400' : 'bg-white border-slate-300 text-black'}`} /></div>
                                         </div>
                                     )}
                                 </div>
                                 {filteredHistory.map(h => (
-                                    <div key={h.id} className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-100'} p-8 rounded-[3.5rem] relative overflow-hidden text-left flex justify-between items-center active:scale-95 transition-all border-l-4 border-l-blue-600`}>
-                                        <div className="space-y-1 text-left">
-                                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-none">{h.company}</p>
+                                    <div key={h.id} className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-100'} p-8 rounded-[3.5rem] relative overflow-hidden flex justify-between items-center group border-l-4 ${h.type === 'mapeamento' ? 'border-l-amber-500' : 'border-l-blue-600'}`}>
+                                        <div className="space-y-1">
+                                            <p className={`text-[9px] font-black uppercase tracking-widest ${h.type === 'mapeamento' ? 'text-amber-500' : 'text-blue-600'}`}>{h.type === 'mapeamento' ? 'Mapeamento Inicial' : h.company}</p>
                                             <h4 className={`text-xl font-black uppercase tracking-tighter leading-none ${darkMode ? 'text-white' : 'text-black'}`}>{h.items?.[0]?.tag}</h4>
-                                            <p className={`text-[9px] font-bold uppercase flex items-center gap-2 ${darkMode ? 'opacity-40' : 'text-slate-600'}`}><Clock size={10} /> {h.data} • {h.hora}</p>
+                                            <p className={`text-[9px] font-bold uppercase flex items-center gap-2 ${darkMode ? 'opacity-40' : 'text-slate-500'}`}><Clock size={10} /> {h.data} • {h.hora} • Turno {h.turno}</p>
                                         </div>
-                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${darkMode ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-green-600 text-white shadow-md shadow-green-200'}`}><IconWA /></button>
+                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${darkMode ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-green-600 text-white shadow-md shadow-green-200'}`}><Send size={18} /></button>
                                     </div>
                                 ))}
                             </div>
                         )}
 
                         {view === 'dash' && (
-                            <div className="space-y-6 animate-pop">
-                                <section className={`${darkMode ? 'glass-dark' : 'bg-white shadow-lg border border-slate-200'} p-10 rounded-[4.5rem] border-t-8 border-t-blue-600 relative overflow-hidden text-left`}>
-                                    <div className="flex justify-between items-end">
-                                        <div className="space-y-1 text-left">
-                                            <h2 className={`text-6xl font-black tracking-tighter leading-none ${darkMode ? 'text-white' : 'text-black'}`}>{statsToday.l}</h2>
-                                            <p className={`text-[11px] font-black opacity-30 uppercase tracking-[0.2em] ${darkMode ? '' : 'text-black'}`}>Tubos Hoje</p>
+                            <div className="space-y-6 animate-pop text-left">
+                                <div className="dashboard-header-fixed">
+                                    <button onClick={handleExportCSV} className={`w-full py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-all ${darkMode ? 'bg-blue-600 text-white shadow-blue-500/30' : 'bg-slate-900 text-white'}`}>
+                                        <DownloadIcon /> Exportar Base Master Excel
+                                    </button>
+                                </div>
+
+                                <section className={`${darkMode ? 'glass-dark border-t-blue-600' : 'bg-white shadow-lg border border-slate-200 border-t-blue-700'} p-10 rounded-[4.5rem] border-t-8 relative overflow-hidden`}>
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="space-y-1">
+                                            <p className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-blue-500' : 'text-blue-700'}`}>Produção Turno {turno}</p>
+                                            <h2 className={`text-6xl font-black tracking-tighter leading-none ${darkMode ? 'text-white' : 'text-black'}`}>{stats.curShiftProd}</h2>
+                                            <p className={`text-[10px] opacity-40 font-bold uppercase ${darkMode ? '' : 'text-black'}`}>Tubos Limpos Hoje</p>
                                         </div>
-                                        <div className="text-right"><p className="text-3xl font-black text-green-500">{statsToday.eff}%</p><p className={`text-[8px] font-black opacity-30 uppercase leading-none tracking-widest ${darkMode ? '' : 'text-black'}`}>Eficiência</p></div>
+                                        <div className="bg-blue-600/10 px-4 py-2 rounded-2xl border border-blue-600/20 text-center">
+                                            <p className="text-blue-500 font-black text-lg leading-none">60</p>
+                                            <p className="text-[7px] font-black uppercase text-blue-400">Meta Turno</p>
+                                        </div>
                                     </div>
-                                    <div className={`w-full h-5 rounded-full overflow-hidden p-1 border mt-8 ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}><div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.6)]" style={{ width: `${statsToday.eff}%` }}></div></div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-[9px] font-black uppercase opacity-40">
+                                            <span className={darkMode ? '' : 'text-black'}>Eficiência no Turno</span>
+                                            <span className={darkMode ? '' : 'text-black'}>{Math.round((stats.curShiftProd/60)*100)}%</span>
+                                        </div>
+                                        <div className={`w-full h-4 rounded-full overflow-hidden p-0.5 border ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
+                                            <div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.6)]" style={{ width: `${Math.min((stats.curShiftProd/60)*100, 100)}%` }}></div>
+                                        </div>
+                                    </div>
                                 </section>
-                                <div className="grid grid-cols-2 gap-4 uppercase font-black text-[8px] tracking-widest">
-                                    <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-10 rounded-[3rem] text-center transition-all`}><p className={`text-3xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{history.length}</p><p className={`mt-2 opacity-30 uppercase ${darkMode ? '' : 'text-black'}`}>Relatórios</p></div>
-                                    <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-10 rounded-[3rem] text-center transition-all leading-none`}><p className={`text-xl font-black text-blue-600 tracking-tighter leading-none`}>{history[0]?.company || '--'}</p><p className={`mt-2 opacity-30 uppercase leading-none ${darkMode ? '' : 'text-black'}`}>Unidade</p></div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className={`${darkMode ? 'glass-dark border-t-green-500' : 'bg-white shadow-md border border-slate-200 border-t-green-500'} p-8 rounded-[3rem] border-t-4 transition-all`}>
+                                        <p className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalLimposAcumulado}</p>
+                                        <p className="text-[8px] font-black opacity-30 uppercase tracking-wider leading-none mt-1 text-green-600">Total Limpos<br/>(Produção)</p>
+                                    </div>
+                                    <div className={`${darkMode ? 'glass-dark border-t-amber-500' : 'bg-white shadow-md border border-slate-200 border-t-amber-500'} p-8 rounded-[3rem] border-t-4 transition-all`}>
+                                        <p className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalMapeados}</p>
+                                        <p className="text-[8px] font-black opacity-30 uppercase tracking-wider leading-none mt-1 text-amber-600">Total Mapeados<br/>(Inicial)</p>
+                                    </div>
+                                </div>
+
+                                <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-8 rounded-[3.5rem] flex justify-between items-center`}>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-red-500">Saldo com Ferro/Obstrução</p>
+                                        <h4 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalObstruidosAcumulado} <span className="text-[10px] opacity-20 font-bold uppercase">Tubos</span></h4>
+                                        <p className="text-[8px] font-bold opacity-30 uppercase">Registrados no Mapeamento Inicial</p>
+                                    </div>
+                                    <div className="w-12 h-12 rounded-full bg-red-600/10 flex items-center justify-center text-red-500 border border-red-500/20">
+                                        <IconAlert />
+                                    </div>
+                                </div>
+
+                                <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-8 rounded-[3.5rem] flex justify-between items-center`}>
+                                    <div className="space-y-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Tamponados</p>
+                                        <h4 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalTamponadosAcumulado} <span className="text-[10px] opacity-20 font-bold uppercase">Tubos</span></h4>
+                                    </div>
+                                    <div className="w-12 h-12 rounded-full bg-slate-600/10 flex items-center justify-center text-slate-400 border border-slate-500/20">
+                                        <IconShield />
+                                    </div>
                                 </div>
                             </div>
                         )}
                     </main>
 
-                    <nav className={`fixed bottom-0 left-0 right-0 border-t p-6 flex justify-around items-center rounded-t-[5.5rem] z-[150] shadow-[0_-15px_60px_rgba(0,0,0,0.1)] backdrop-blur-3xl transition-all duration-300 ${darkMode ? 'glass-dark border-white/10 bg-slate-950/90' : 'bg-white border-slate-200 shadow-2xl'}`}>
+                    <nav className={`fixed bottom-0 left-0 right-0 border-t p-6 flex justify-around items-center rounded-t-[5.5rem] z-[150] shadow-[0_-30px_90px_rgba(0,0,0,0.1)] backdrop-blur-3xl transition-all duration-300 ${darkMode ? 'glass-dark border-white/10 bg-slate-950/90' : 'bg-white border-slate-200 shadow-2xl'}`}>
                         <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 transition-all duration-300 ${view === 'history' ? 'text-blue-600 scale-110' : (darkMode ? 'text-slate-400 opacity-60' : 'text-slate-600')}`}>
                             <IconHistory />
                             <span className="text-[8px] font-black uppercase tracking-widest text-[7px]">Registos</span>
                         </button>
-                        
                         <button onClick={() => setView('form')} className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 center-btn ${view === 'form' ? 'bg-blue-600 text-white scale-110' : (darkMode ? 'bg-slate-800 text-slate-400 border-[#0f172a]' : 'bg-slate-50 text-slate-500 border-slate-200 shadow-inner')}`}>
                             <IconPlus />
                         </button>
-
                         <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-1 transition-all duration-300 ${view === 'dash' ? 'text-blue-600 scale-110' : (darkMode ? 'text-slate-400 opacity-60' : 'text-slate-600')}`}>
                             <IconDashboard />
                             <span className="text-[8px] font-black uppercase tracking-widest text-[7px]">Painel</span>
