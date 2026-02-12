@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="google" content="notranslate">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>HidroControl App 3.5 - Alumar</title>
+    <title>HidroControl App 4.5 Pro - Alumar</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -13,11 +13,13 @@
     <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
-        // Disponibiliza o Firebase para o Babel
-        window.FB_CORE = { initializeApp, getFirestore, collection, addDoc, query, onSnapshot, getAuth, signInAnonymously, onAuthStateChanged, signOut };
+        window.FB_CORE = { 
+            initializeApp, getFirestore, collection, addDoc, query, onSnapshot, doc, setDoc, getDoc, updateDoc,
+            getAuth, signInAnonymously, onAuthStateChanged, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword 
+        };
     </script>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
@@ -26,42 +28,32 @@
         .glass-dark { background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(24px); }
         .glass-light { background: rgba(255, 255, 255, 1); border: 1px solid rgba(0, 0, 0, 0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
         .animate-pop { animation: fadeIn 0.25s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.98) translateY(10px); } to { opacity: 1; transform: scale(1) translateY(0); } }
         .dropdown-scroll::-webkit-scrollbar { width: 6px; }
         .dropdown-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 10px; }
         .hide-scroll::-webkit-scrollbar { display: none; }
         
-        .center-btn { transform: translateY(-28px); box-shadow: 0 12px 40px rgba(59, 130, 246, 0.45); z-index: 100; transition: all 0.3s ease; }
-        .center-btn:active { transform: translateY(-24px) scale(0.92); }
+        /* Botão de Registro Central Elevado - Identidade 4.5 */
+        .center-btn {
+            transform: translateY(-32px);
+            box-shadow: 0 15px 45px rgba(59, 130, 246, 0.5);
+            z-index: 100;
+            border: 6px solid #0f172a;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .center-btn:active { transform: translateY(-28px) scale(0.92); }
         
-        .select-window { position: absolute; left: 0; right: 0; top: 100%; z-index: 999 !important; margin-top: 8px; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25); border-radius: 1.5rem; overflow: hidden; }
-        
-        /* Dashboard Sticky Fix */
+        .select-window { position: absolute; left: 0; right: 0; top: 100%; z-index: 999 !important; margin-top: 8px; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3); border-radius: 1.5rem; overflow: hidden; }
         .dashboard-header-fixed { position: sticky; top: -24px; z-index: 150; margin-bottom: 20px; }
+        .login-bg { background: radial-gradient(circle at top right, #1e293b, #020617); }
+        .photo-preview { width: 100%; height: 100px; object-fit: cover; border-radius: 0.75rem; border: 1px solid rgba(255,255,255,0.1); }
     </style>
 </head>
 <body class="overflow-x-hidden hide-scroll bg-slate-950">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
-
-        // --- COMPONENTES DE ÍCONES (DEFINIÇÃO MANUAL PARA ESTABILIDADE) ---
-        const Clock = ({ size = 18 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
-        const IconHistory = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
-        const IconDashboard = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
-        const IconPlus = () => <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-        const IconWA = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.031 6.172c-2.203 0-3.991 1.789-3.991 3.991 0 .86.273 1.656.74 2.308l-.513 1.874 1.921-.504a3.978 3.978 0 0 0 1.843.456c2.203 0 3.991-1.789 3.991-3.991 0-2.203-1.788-3.991-3.991-3.991zm2.348 5.617c-.1.282-.578.536-.795.568-.217.032-.435.056-1.258-.266-.822-.323-1.354-1.157-1.394-1.212-.04-.054-.33-.44-.33-.84s.21-.6.284-.68c.074-.08.162-.1.216-.1.054 0 .108 0 .156.006.054.004.12.004.186.162.066.162.228.552.246.594.018.042.03.09.006.138-.024.048-.042.084-.126.18-.084.096-.15.162-.222.246-.078.078-.156.168-.066.324.09.156.39.642.84 1.044.576.516 1.062.678 1.212.75.15.072.24.06.33-.042.09-.102.39-.456.492-.612.102-.156.204-.132.342-.084.138.048.876.414 1.026.492.15.078.252.114.288.18.036.066.036.384-.066.666z"/></svg>;
-        const IconCheck = () => <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" className="text-green-500"><path d="M20 6L9 17l-5-5"/></svg>;
-        const MapPin = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>;
-        const Building2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><path d="M7 22V13h10v9M2 8h20M2 14h20M7 8v5M17 8v5"/></svg>;
-        const Trash2 = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>;
-        const DatabaseIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>;
-        const DownloadIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>;
-        const IconShield = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
-        const IconAlert = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>;
-        const Send = ({ size = 18 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
-
+        // --- CONFIGURAÇÃO GLOBAL ---
         const firebaseConfig = {
             apiKey: "AIzaSyAPM1NNw9PazMccz5kxZjFAqOYKLqQwLxo",
             authDomain: "hidrocontrol-alumar.firebaseapp.com",
@@ -70,6 +62,9 @@
             messagingSenderId: "1080945827345",
             appId: "1:1080945827345:web:bd083793e95f943cb25bb0"
         };
+
+        const ADMIN_EMAIL = "alanlindoso1@gmail.com";
+        const APP_ID = "hidrocontrol-alumar";
 
         const AREA_TAG_MAPPING = {
             "025A": ["025A-TC-21A", "025A-TC-21B", "025A-TC-21C", "025A-TC-21D", "025A-TC-21E", "025A-TC-21F", "025A-TC-31A", "025A-TC-31B", "025A-TC-31C", "025A-TC-31D", "025A-TC-31E", "025A-TC-31F"],
@@ -82,19 +77,44 @@
         const EQUIPAMENTOS_TOTAIS = {
             ...Object.fromEntries(Object.values(AREA_TAG_MAPPING).flat().map(t=>[t, 180])),
             ...Object.fromEntries(["025A-TC-21A", "025A-TC-21B", "025A-TC-21C", "025A-TC-21D", "025A-TC-21E", "025A-TC-21F", "025A-TC-31A", "025A-TC-31B", "025A-TC-31C", "025A-TC-31D", "025A-TC-31E", "025A-TC-31F"].map(t=>[t, 33])),
-            ...Object.fromEntries(["030-TC-17A", "030-TC-17B", "030-TC-17C", "030-TC-17D", "030-TC-17E", "030-TC-17F", "030-TC-18A", "030-TC-18B", "030-TC-18C", "030-TC-18D", "030-TC-18E", "030-TC-18F"].map(t=>[t, 33])),
-            "030-TC-001": 600, "030-TC-019": 600, "030-TC-029": 600,
-            ...Object.fromEntries(["030-TC-002", "030-TC-003", "030-TC-004", "030-TC-005", "030-TC-006", "030-TC-007", "030-TC-008"].map(t=>[t, 880])),
-            "030-TC-009": 1000, "030-TC-010": 1000,
-            ...Object.fromEntries(["040-TC-011", "040-TC-012", "040-TC-013", "040-TC-014", "040-TC-015"].map(t=>[t, 1000])),
-            ...Object.fromEntries(["042-TC-011", "042-TC-012", "042-TC-013", "042-TC-014", "042-TC-015", "042-TC-016", "042-TC-017", "042-TC-018", "042-TC-019"].map(t=>[t, 1000]))
+            "030-TC-001": 600, "030-TC-002": 880, "030-TC-009": 1000
         };
 
         const AREAS_LISTA = Object.keys(AREA_TAG_MAPPING);
         const EQUIPAMENTOS_ALL = Object.keys(EQUIPAMENTOS_TOTAIS);
 
+        // --- COMPONENTES DE ÍCONES ---
+        const Clock = ({ size = 18 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+        const IconHistory = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>;
+        const IconDashboard = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
+        const IconPlus = () => <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+        const IconCheck = ({ size = 20 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-green-500"><polyline points="20 6 9 17 4 12"/></svg>;
+        const MapPin = ({ size = 18 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>;
+        const Building2 = ({ size = 18 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><path d="M7 22V13h10v9M2 8h20M2 14h20M7 8v5M17 8v5"/></svg>;
+        const DownloadIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>;
+        const IconShield = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+        const IconUsers = ({ size = 24 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+        const IconLogOut = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
+        const IconLock = () => <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-amber-500"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
+        const SendIcon = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
+        const DatabaseIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>;
+        const IconTrash = ({ size = 18 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6M14 11v6"/></svg>;
+        const IconTrending = () => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
+        const IconCamera = ({ size = 20 }) => <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>;
+        
+        // Ícone WhatsApp Ampliado - Conforme imagem (Preenchimento máximo)
+        const IconWhatsAppShare = ({ size = 42 }) => (
+            <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className="text-white">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.414 0 .018 5.396.015 12.03c0 2.12.554 4.189 1.604 6.002L0 24l6.136-1.61a11.81 11.81 0 005.91 1.57h.005c6.634 0 12.032-5.396 12.035-12.03.003-3.214-1.246-6.234-3.518-8.506" />
+            </svg>
+        );
+
+        const { useState, useEffect, useMemo } = React;
+
         const App = () => {
             const [user, setUser] = useState(null);
+            const [userStatus, setUserStatus] = useState('loading'); 
+            const [allUsers, setAllUsers] = useState([]);
             const [view, setView] = useState('form'); 
             const [history, setHistory] = useState([]);
             const [loading, setLoading] = useState(false);
@@ -102,69 +122,154 @@
             const [historyFilter, setHistoryFilter] = useState('0');
             const [dateRange, setDateRange] = useState({ start: '', end: '' });
             const [isSynced, setIsSynced] = useState(false);
-            
+            const [authForm, setAuthForm] = useState({ email: '', password: '', isLogin: true });
+            const [error, setError] = useState('');
+
+            // Estados Produção
             const [regType, setRegType] = useState('producao'); 
             const [company, setCompany] = useState('MONTISOL');
             const [turno, setTurno] = useState('ADM');
+            const [bomba, setBomba] = useState('UAP');
             const [area, setArea] = useState('');
             const [areaSearch, setAreaSearch] = useState('');
             const [showAreaList, setShowAreaList] = useState(false);
-            const [items, setItems] = useState([{ tag: '', limpos: '', ferro: '', obstruidos: '', tamponados: '', totalTag: '180', search: '', showList: false }]);
+            const [horarios, setHorarios] = useState({ inicio: '', fim: '' });
+            const [items, setItems] = useState([{ tag: '', limpos: '', ferro: '', obstruidos: '', tamponados: '', totalTag: '180', search: '', showList: false, impactos: '', observacoes: '', photoBefore: null, photoAfter: null }]);
 
-            // --- FIREBASE SYNC ---
-            useEffect(() => {
-                const interval = setInterval(() => {
-                    const fb = window.FB_CORE;
-                    if (fb) {
-                        clearInterval(interval);
-                        const app = fb.initializeApp(firebaseConfig);
-                        const auth = fb.getAuth(app);
-                        const db = fb.getFirestore(app);
-                        fb.onAuthStateChanged(auth, (u) => {
-                            if (u) {
-                                setUser(u);
-                                fb.onSnapshot(fb.collection(db, 'artifacts', 'hidrocontrol-alumar', 'public', 'data', 'registos'), (snap) => {
-                                    setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => b.ts - a.ts));
-                                    setIsSynced(true);
-                                });
-                            } else { fb.signInAnonymously(auth); }
-                        });
-                    }
-                }, 100);
-                return () => clearInterval(interval);
-            }, []);
-
+            // --- LÓGICA DE FILTRAGEM ---
             const filteredHistory = useMemo(() => {
                 const todayStr = new Date().toLocaleDateString('pt-BR');
+                const now = Date.now();
                 return history.filter(h => {
-                    if (historyFilter === '0') return h.data === todayStr;
                     if (historyFilter === 'custom' && dateRange.start && dateRange.end) {
                         const hDate = new Date(h.ts);
-                        return hDate >= new Date(dateRange.start) && hDate <= new Date(dateRange.end + 'T23:59:59');
+                        const sDate = new Date(dateRange.start + 'T00:00:00');
+                        const eDate = new Date(dateRange.end + 'T23:59:59');
+                        return hDate >= sDate && hDate <= eDate;
                     }
+                    if (historyFilter === '0') return h.data === todayStr;
                     const days = parseInt(historyFilter);
-                    return (Date.now() - h.ts) <= (days * 24 * 60 * 60 * 1000);
+                    return (now - h.ts) <= (days * 24 * 60 * 60 * 1000);
                 });
             }, [history, historyFilter, dateRange]);
 
-            // --- MÉTRICAS DO PAINEL 3.5 ---
+            // --- MÉTRICAS REAIS DO PAINEL 4.0/4.5 ---
             const stats = useMemo(() => {
                 const todayStr = new Date().toLocaleDateString('pt-BR');
                 const todayData = history.filter(h => h.data === todayStr);
                 
-                const curShiftProd = todayData
-                    .filter(h => h.turno === turno && h.type === 'producao')
-                    .reduce((acc, curr) => acc + curr.items.reduce((a, i) => a + Number(i.limpos || 0), 0), 0);
-
+                const curShiftProd = todayData.filter(h => h.turno === turno && h.type === 'producao').reduce((acc, curr) => acc + curr.items.reduce((a, i) => a + Number(i.limpos || 0), 0), 0);
                 const totalLimposAcumulado = history.filter(h => h.type === 'producao').reduce((acc, curr) => acc + curr.items.reduce((a, i) => a + Number(i.limpos || 0), 0), 0);
                 const totalObstruidosAcumulado = history.filter(h => h.type === 'mapeamento').reduce((acc, curr) => acc + curr.items.reduce((a, i) => a + Number(i.obstruidos || 0), 0), 0);
-                const totalTamponadosAcumulado = history.filter(h => h.type === 'mapeamento').reduce((acc, curr) => acc + curr.items.reduce((a, i) => a + Number(i.tamponados || 0), 0), 0);
-                const totalMapeados = totalObstruidosAcumulado + totalTamponadosAcumulado;
-
-                return { curShiftProd, totalLimposAcumulado, totalMapeados, totalTamponadosAcumulado, totalObstruidosAcumulado };
+                const saldoReal = Math.max(0, totalObstruidosAcumulado - totalLimposAcumulado);
+                return { curShiftProd, totalLimposAcumulado, saldoReal, totalObstruidosAcumulado };
             }, [history, turno]);
 
-            const updateItem = (idx, field, val) => {
+            // --- FIREBASE INIT ---
+            useEffect(() => {
+                const fb = window.FB_CORE;
+                if (!fb) return;
+                const app = fb.initializeApp(firebaseConfig);
+                const auth = fb.getAuth(app);
+                const db = fb.getFirestore(app);
+
+                const unsubAuth = fb.onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        setUser(u);
+                        const userDocRef = fb.doc(db, 'artifacts', APP_ID, 'public', 'data', 'usuarios', u.uid);
+                        const userDoc = await fb.getDoc(userDocRef);
+
+                        let currentStatus = 'pending';
+                        if (!userDoc.exists()) {
+                            currentStatus = u.email === ADMIN_EMAIL ? 'authorized' : 'pending';
+                            await fb.setDoc(userDocRef, { email: u.email, uid: u.uid, status: currentStatus, createdAt: Date.now() });
+                        } else {
+                            currentStatus = userDoc.data().status;
+                        }
+                        setUserStatus(currentStatus);
+
+                        if (currentStatus === 'authorized') {
+                            fb.onSnapshot(fb.collection(db, 'artifacts', APP_ID, 'public', 'data', 'registos'), (snap) => {
+                                setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => b.ts - a.ts));
+                                setIsSynced(true);
+                            });
+                        }
+
+                        if (u.email === ADMIN_EMAIL) {
+                            fb.onSnapshot(fb.collection(db, 'artifacts', APP_ID, 'public', 'data', 'usuarios'), (snap) => {
+                                setAllUsers(snap.docs.map(d => d.data()));
+                            });
+                        }
+                    } else {
+                        setUser(null);
+                        setUserStatus('none');
+                    }
+                });
+                return () => unsubAuth();
+            }, []);
+
+            const handleAuth = async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                const fb = window.FB_CORE;
+                try {
+                    if (authForm.isLogin) await fb.signInWithEmailAndPassword(fb.getAuth(), authForm.email, authForm.password);
+                    else await fb.createUserWithEmailAndPassword(fb.getAuth(), authForm.email, authForm.password);
+                } catch (err) { setError("Credenciais incorretas."); }
+                setLoading(false);
+            };
+
+            const toggleAuth = async (targetUid, status) => {
+                const fb = window.FB_CORE;
+                await fb.updateDoc(fb.doc(fb.getFirestore(), 'artifacts', APP_ID, 'public', 'data', 'usuarios', targetUid), {
+                    status: status === 'authorized' ? 'pending' : 'authorized'
+                });
+            };
+
+            const handleSend = async () => {
+                setLoading(true);
+                const fb = window.FB_CORE;
+                try {
+                    const docData = {
+                        data: new Date().toLocaleDateString('pt-BR'),
+                        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                        ts: Date.now(), type: regType, company, turno, bomba, area, horarios, user: user.email,
+                        items: items.map(i => ({ ...i, showList: false, search: '' }))
+                    };
+                    await fb.addDoc(fb.collection(fb.getFirestore(), 'artifacts', APP_ID, 'public', 'data', 'registos'), docData);
+                    setView('success');
+                } catch (e) {}
+                setLoading(false);
+            };
+
+            const handleExport = () => {
+                let csv = "Data,Hora,Tipo,TAG,Limpos,Obstruidos,Turno,Bomba,Utilizador\n";
+                history.forEach(h => h.items.forEach(i => {
+                    csv += `${h.data},${h.hora},${h.type},${i.tag},${i.limpos||0},${i.obstruidos||0},${h.turno},${h.bomba},${h.user}\n`;
+                }));
+                const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: "text/csv" });
+                const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "HidroControl_Alumar_PRO_BaseMaster.csv"; link.click();
+            };
+
+            const getWhatsAppLink = (reg) => {
+                const isMap = reg.type === 'mapeamento';
+                let msg = `*🚀 RELATÓRIO HIDROJATO ALUMAR*\n\n` +
+                          `🏭 *Unidade:* ${reg.company}\n` +
+                          `📍 *Área:* ${reg.area}\n` +
+                          `⏰ *Turno:* ${reg.turno}\n` +
+                          `⚡ *Bomba:* ${reg.bomba || 'N/A'}\n` +
+                          `🕒 *Início:* ${reg.horarios?.inicio || '--'} | *Fim:* ${reg.horarios?.fim || '--'}\n` +
+                          `📌 *Tipo:* ${isMap ? 'MAPEAMENTO INICIAL' : 'PRODUÇÃO'}\n\n` +
+                          `--------------------------\n`;
+                
+                reg.items.forEach(i => {
+                    msg += `🛠️ *TAG:* ${i.tag}\n` + (isMap ? `❌ Obstruídos: ${i.obstruidos}\n` : `✅ Limpos: ${i.limpos}\n`) + `${i.impactos ? `⚠️ Impactos: ${i.impactos}\n` : ''}` + `${i.observacoes ? `📝 Obs: ${i.observacoes}\n` : ''}` + `---%0A`;
+                });
+                msg += `_Gerado via HidroControl v4.5 Pro_`;
+                return `https://wa.me/?text=${encodeURIComponent(msg)}`;
+            };
+
+            const updateItemValue = (idx, field, val) => {
                 const newItems = [...items];
                 newItems[idx][field] = val;
                 if (field === 'tag' && EQUIPAMENTOS_TOTAIS[val]) {
@@ -173,87 +278,82 @@
                 setItems(newItems);
             };
 
-            const handleSend = async () => {
-                if (!user || items.some(i => !i.tag)) return;
-                setLoading(true);
-                try {
-                    const fb = window.FB_CORE;
-                    const docData = {
-                        data: new Date().toLocaleDateString('pt-BR'),
-                        hora: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-                        ts: Date.now(),
-                        type: regType,
-                        company, turno, area,
-                        user: user.uid,
-                        items: items.map(i => ({ ...i, showList: false, search: '' }))
-                    };
-                    await fb.addDoc(fb.collection(fb.getFirestore(), 'artifacts', 'hidrocontrol-alumar', 'public', 'data', 'registos'), docData);
-                    setView('success');
-                } catch (e) { console.error(e); }
-                setLoading(false);
+            const handlePhotoUpload = (idx, type, e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const newItems = [...items];
+                    newItems[idx][type] = reader.result;
+                    setItems(newItems);
+                };
+                reader.readAsDataURL(file);
             };
 
-            const handleExportCSV = () => {
-                let csv = "Data,Hora,Tipo,Empresa,Turno,Area,TAG,Limpos,Obstruidos,Tamponados,Ferro,Total\n";
-                history.forEach(h => {
-                    h.items.forEach(i => {
-                        csv += `${h.data},${h.hora},${h.type},${h.company},${h.turno},${h.area},${i.tag},${i.limpos || 0},${i.obstruidos || 0},${i.tamponados || 0},${i.ferro || 0},${i.totalTag}\n`;
-                    });
-                });
-                const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csv], { type: "text/csv;charset=utf-8;" });
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = `HidroControl_Alumar_BaseMaster_3.5.csv`;
-                link.click();
-            };
+            // --- TELAS ---
+            if (userStatus === 'none' || !user) return (
+                <div className="min-h-screen login-bg flex items-center justify-center p-6 text-white text-center">
+                    <div className="glass-dark w-full max-w-sm p-10 rounded-[3.5rem] space-y-8 animate-pop border border-white/5 shadow-2xl">
+                        <h1 className="font-black text-3xl italic text-blue-500 uppercase leading-none">Hidro<span className="text-white">Control</span></h1>
+                        <form onSubmit={handleAuth} className="space-y-4 text-left">
+                            <label className="text-[10px] font-black uppercase opacity-40 ml-2 tracking-widest text-slate-300">E-mail Corporativo</label>
+                            <input type="email" placeholder="exemplo@alumar.com" required className="w-full bg-slate-900 border border-white/5 p-4 rounded-2xl outline-none" value={authForm.email} onChange={e => setAuthForm({...authForm, email: e.target.value})} />
+                            <label className="text-[10px] font-black uppercase opacity-40 ml-2 tracking-widest text-slate-300">Senha</label>
+                            <input type="password" placeholder="******" required className="w-full bg-slate-900 border border-white/5 p-4 rounded-2xl outline-none" value={authForm.password} onChange={e => setAuthForm({...authForm, password: e.target.value})} />
+                            {error && <p className="text-red-500 text-[10px] uppercase font-bold text-center">{error}</p>}
+                            <button className="w-full bg-blue-600 py-4 rounded-2xl font-black uppercase shadow-lg shadow-blue-600/20">Entrar</button>
+                        </form>
+                    </div>
+                </div>
+            );
 
-            const getWhatsAppLink = (reg) => {
-                const isMap = reg.type === 'mapeamento';
-                let msg = `*HIDROJATO ALUMAR 3.5 - ${reg.company}*%0A` +
-                          `📍 *Área:* ${reg.area} | *Turno:* ${reg.turno}%0A` +
-                          `📌 *Tipo:* ${isMap ? 'MAPEAMENTO INICIAL' : 'PRODUÇÃO'}%0A%0A`;
-                
-                reg.items.forEach(i => {
-                    msg += `🛠️ *TAG:* ${i.tag}%0A` +
-                           (isMap ? `❌ Obstruídos: ${i.obstruidos}%0A🔒 Tamponados: ${i.tamponados}%0A` : 
-                                    `✅ Limpos: ${i.limpos}%0A⚠️ Ferro: ${i.ferro}%0A`) +
-                           `📊 Total: ${i.totalTag}%0A---%0A`;
-                });
-                return `https://wa.me/?text=${msg}`;
-            };
+            if (userStatus === 'pending') return (
+                <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-8 text-center space-y-6 text-white">
+                    <div className="w-24 h-24 bg-amber-500/10 rounded-full flex items-center justify-center border-2 border-amber-500/30 animate-pulse text-amber-500"><IconLock /></div>
+                    <h2 className="text-2xl font-black italic uppercase tracking-tighter text-white leading-none">Acesso Pendente</h2>
+                    <p className="text-sm text-slate-400 max-w-xs mx-auto">Olá {user.email}, o teu cadastro foi concluído. Aguarda que o administrador (Alan) autorize o teu acesso.</p>
+                    <button onClick={() => window.FB_CORE.signOut(window.FB_CORE.getAuth())} className="text-[10px] font-black uppercase text-red-500 border border-red-500/20 px-6 py-3 rounded-xl transition-all">Sair da Conta</button>
+                </div>
+            );
 
             return (
                 <div className={`min-h-screen flex flex-col max-w-lg mx-auto transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-black'}`}>
                     
                     {view === 'success' && (
-                        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-pop text-center text-white">
-                            <div className={`${darkMode ? 'glass-dark' : 'glass-light shadow-2xl'} w-full max-w-sm p-12 rounded-[4rem] space-y-8`}>
-                                <IconCheck className="mx-auto" />
-                                <h2 className={`text-2xl font-black uppercase italic tracking-tighter ${darkMode ? 'text-white' : 'text-black'}`}>SINCRONIZADO!</h2>
-                                <button onClick={() => { setView('history'); }} className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs shadow-lg text-white">Ver Registros</button>
+                        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/90 backdrop-blur-xl animate-pop text-center text-white text-center">
+                            <div className="glass-dark w-full max-w-sm p-12 rounded-[4rem] space-y-8">
+                                <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto border-2 border-green-500/40 text-green-500">
+                                    <IconCheck size={40} />
+                                </div>
+                                <h2 className="text-2xl font-black italic uppercase tracking-tighter text-white leading-none">SINCRONIZADO!</h2>
+                                <button onClick={() => { setView('history'); setItems([{ tag: '', limpos: '', ferro: '', obstruidos: '', tamponados: '', totalTag: '180', search: '', showList: false, impactos: '', observacoes: '', photoBefore: null, photoAfter: null }]); }} className="w-full bg-blue-600 py-6 rounded-3xl font-black uppercase text-xs shadow-lg">Ver Registos</button>
                             </div>
                         </div>
                     )}
 
-                    <header className={`p-6 flex justify-between items-center sticky top-0 z-[200] backdrop-blur-3xl border-b transition-all ${darkMode ? 'border-white/5 bg-slate-950/80' : 'border-slate-200 bg-white/90'}`}>
+                    <header className={`p-6 flex justify-between items-center sticky top-0 z-[200] backdrop-blur-3xl border-b ${darkMode ? 'border-white/5 bg-slate-950/80' : 'border-slate-200 bg-white/90 shadow-sm'}`}>
                         <div className="flex flex-col text-left">
                             <h1 className={`font-black text-2xl italic uppercase tracking-tighter leading-none ${darkMode ? 'text-blue-500' : 'text-blue-700'}`}>Hidro<span className={darkMode ? 'text-white' : 'text-black'}>Control</span></h1>
-                            <div className="flex items-center gap-1.5 mt-1">
-                                <span className={`text-[9px] font-bold uppercase tracking-widest ${darkMode ? 'opacity-40' : 'text-slate-600'}`}>ALUMAR PREMIUM v3.5</span>
+                            <div className="flex items-center gap-1.5 mt-1 font-bold text-[9px] uppercase tracking-widest leading-none">
+                                {user.email === ADMIN_EMAIL && <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-[7px]">ADMIN</span>}
+                                <span className="opacity-50 tracking-tighter">APP v4.5 PRO</span>
                                 {isSynced && <div className="text-green-500 animate-pulse"><DatabaseIcon /></div>}
                             </div>
                         </div>
-                        <button onClick={() => setDarkMode(!darkMode)} className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${darkMode ? 'border-white/10 bg-slate-900 text-white' : 'border-slate-300 bg-white text-black shadow-sm'}`}>{darkMode ? '☀️' : '🌙'}</button>
+                        <div className="flex gap-3">
+                            <button onClick={() => setDarkMode(!darkMode)} className={`w-10 h-10 rounded-full flex items-center justify-center border transition-all ${darkMode ? 'border-white/10 bg-slate-900 text-white' : 'border-slate-300 bg-white text-black shadow-sm'}`}>{darkMode ? '☀️' : '🌙'}</button>
+                            <button onClick={() => window.FB_CORE.signOut(window.FB_CORE.getAuth())} className="text-red-500 hover:scale-110 transition-all leading-none flex items-center"><IconLogOut /></button>
+                        </div>
                     </header>
 
-                    <main className="p-6 pb-48 space-y-6 overflow-y-auto hide-scroll">
+                    <main className="p-6 pb-48 space-y-6 overflow-y-auto hide-scroll text-left">
                         {view === 'form' && (
                             <div className="space-y-6 animate-pop text-left">
-                                <div className={`p-1.5 rounded-2xl flex gap-1 border ${darkMode ? 'bg-slate-900/40 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
-                                    <button onClick={() => setRegType('mapeamento')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${regType === 'mapeamento' ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-50'}`}>Mapeamento</button>
-                                    <button onClick={() => setRegType('producao')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${regType === 'producao' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-50'}`}>Produção</button>
+                                <div className={`p-1.5 rounded-2xl flex gap-1 border ${darkMode ? 'bg-slate-900/40 border-white/5' : 'bg-slate-100 border-slate-200 shadow-inner'}`}>
+                                    <button onClick={() => setRegType('mapeamento')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${regType === 'mapeamento' ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-500'}`}>Mapeamento</button>
+                                    <button onClick={() => setRegType('producao')} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase transition-all ${regType === 'producao' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-500'}`}>Produção</button>
                                 </div>
-
+                                
                                 <div className="grid grid-cols-2 gap-2">
                                     {['MONTISOL', 'CONSTEC'].map(c => (
                                         <button key={c} onClick={() => setCompany(c)} className={`py-4 rounded-xl font-black text-[10px] border transition-all ${company === c ? 'bg-blue-600 text-white border-blue-400 shadow-md' : (darkMode ? 'bg-slate-900/50 border-white/5 text-slate-500' : 'bg-white border-slate-200 text-slate-900 shadow-sm')}`}>{c}</button>
@@ -262,189 +362,207 @@
 
                                 <div className="grid grid-cols-3 gap-2">
                                     {['ADM', 'T.C', 'T.A'].map(t => (
-                                        <button key={t} onClick={() => setTurno(t)} className={`py-4 rounded-xl font-black text-[10px] border transition-all ${turno === t ? 'bg-blue-600 border-blue-400 text-white shadow-md' : (darkMode ? 'bg-slate-900/50 border-white/5 text-slate-500' : 'bg-white border-slate-200 text-slate-900 shadow-sm')}`}>{t}</button>
+                                        <button key={t} onClick={() => setTurno(t)} className={`py-4 rounded-xl font-black text-[10px] border transition-all ${turno === t ? 'bg-blue-600 text-white shadow-lg border-blue-400' : (darkMode ? 'bg-slate-900/50 border-white/5 text-slate-500' : 'bg-white border-slate-200 shadow-sm')}`}>{t}</button>
                                     ))}
                                 </div>
 
-                                <section className={`${darkMode ? 'glass-dark' : 'glass-light shadow-sm'} p-8 rounded-[2.5rem] relative`} style={{ zIndex: showAreaList ? 300 : 10 }}>
-                                    <label className={`text-[10px] font-black uppercase mb-2 block tracking-widest ${darkMode ? 'text-slate-400' : 'text-black'}`}>Área Operacional</label>
-                                    <div className="relative">
-                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"><MapPin /></div>
-                                        <input type="text" placeholder="BUSCAR ÁREA..." value={areaSearch} onFocus={() => setShowAreaList(true)} onChange={(e) => { setAreaSearch(e.target.value.toUpperCase()); setShowAreaList(true); }} className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black focus:border-blue-500'}`} />
-                                    </div>
-                                    {showAreaList && (
-                                        <div className={`select-window ${darkMode ? 'glass-dark' : 'bg-white border-slate-300'} border`}>
-                                            <div className="max-h-64 overflow-y-auto dropdown-scroll uppercase">
-                                                {AREAS_LISTA.filter(a => a.includes(areaSearch)).map(a => (
-                                                    <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className={`px-6 py-5 text-xs font-black border-b cursor-pointer flex justify-between transition-all ${darkMode ? 'border-white/5 hover:bg-blue-600 text-slate-200' : 'border-slate-100 hover:bg-slate-50 text-black'}`}><span>{a}</span><span className="opacity-30 text-[8px]">SELECIONAR</span></div>
+                                <section className={`${darkMode ? 'glass-dark border-white/5' : 'bg-white border-slate-200 shadow-md'} p-8 rounded-[2.5rem] relative text-left`} style={{ zIndex: showAreaList ? 300 : 10 }}>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <label className={`text-[10px] font-black uppercase mb-1 block tracking-widest ${darkMode ? 'text-slate-400' : 'text-black'}`}>Bomba Principal</label>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {['UAP', 'SAP'].map(b => (
+                                                    <button key={b} onClick={() => setBomba(b)} className={`py-3 rounded-xl font-black text-xs border transition-all ${bomba === b ? 'bg-blue-600 text-white border-blue-400 shadow-md' : (darkMode ? 'bg-slate-950 border-slate-800 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400')}`}>{b}</button>
                                                 ))}
                                             </div>
                                         </div>
-                                    )}
-                                </section>
-
-                                {items.map((it, idx) => (
-                                    <section key={idx} className={`${darkMode ? 'glass-dark' : 'glass-light shadow-sm'} p-8 rounded-[3.5rem] space-y-6 relative border-l-[12px] ${regType === 'mapeamento' ? 'border-amber-500' : 'border-blue-600'} transition-all`} style={{ zIndex: it.showList ? 200 : 5 }}>
-                                        {idx > 0 && <button onClick={() => setItems(items.filter((_,i)=>i!==idx))} className="absolute top-6 right-6 text-red-500/60 hover:text-red-500 transition-all font-black text-[10px] uppercase tracking-widest">Remover</button>}
-                                        <div className="space-y-2 relative">
-                                            <label className={`text-[10px] font-black uppercase tracking-widest block leading-none mb-1 ${darkMode ? 'text-slate-400' : 'text-black'}`}>Equipamento (TAG)</label>
+                                        <div className="space-y-1">
+                                            <label className={`text-[10px] font-black uppercase mb-1 block tracking-widest ${darkMode ? 'text-slate-400' : 'text-black'}`}>Área Operacional</label>
                                             <div className="relative">
-                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"><Building2 /></div>
-                                                <input type="text" placeholder={area ? `TAGS DA ÁREA ${area}...` : "BUSCAR TAG..."} value={it.search} onFocus={() => { const n = [...items]; n[idx].showList = true; setItems(n); }} onChange={(e) => { const n = [...items]; n[idx].search = e.target.value.toUpperCase(); n[idx].showList = true; setItems(n); }} className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black focus:border-blue-500 shadow-inner'}`} />
+                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"><MapPin size={18} /></div>
+                                                <input type="text" placeholder="BUSCAR ÁREA..." value={areaSearch} onFocus={() => setShowAreaList(true)} onChange={(e) => { setAreaSearch(e.target.value.toUpperCase()); setShowAreaList(true); }} className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black placeholder-slate-300 shadow-inner'}`} />
                                             </div>
-                                            {it.showList && (
-                                                <div className={`select-window ${darkMode ? 'glass-dark' : 'bg-white border-slate-300'} border`}>
-                                                    <div className="max-h-64 overflow-y-auto dropdown-scroll uppercase">
-                                                        {(area ? AREA_TAG_MAPPING[area] : EQUIPAMENTOS_ALL).filter(t => t.includes(it.search)).map(tag => (
-                                                            <div key={tag} onClick={() => { updateItem(idx, 'tag', tag); updateItem(idx, 'search', tag); updateItem(idx, 'showList', false); }} className={`px-6 py-5 text-xs font-bold border-b cursor-pointer flex justify-between transition-all ${darkMode ? 'border-white/5 hover:bg-blue-600 text-slate-200' : 'border-slate-100 hover:bg-slate-50 text-black'}`}><span>{tag}</span><span className="opacity-20 font-black text-[7px]">ESCOLHER</span></div>
-                                                        ))}
-                                                    </div>
+                                            {showAreaList && (
+                                                <div className={`select-window ${darkMode ? 'glass-dark border-white/5' : 'bg-white border-slate-300 shadow-2xl'} border`}>
+                                                    {AREAS_LISTA.filter(a => a.includes(areaSearch)).map(a => (
+                                                        <div key={a} onClick={() => { setArea(a); setAreaSearch(a); setShowAreaList(false); }} className={`px-6 py-5 text-xs font-black border-b cursor-pointer flex justify-between ${darkMode ? 'hover:bg-blue-600 text-white border-white/5' : 'hover:bg-slate-50 text-black border-slate-100'}`}><span>{a}</span><span className="opacity-30 text-[7px] uppercase tracking-widest">Selecionar</span></div>
+                                                    ))}
                                                 </div>
                                             )}
                                         </div>
-                                        
+                                        <div className="grid grid-cols-2 gap-4 pt-2">
+                                            <div className="space-y-1 text-left"><label className={`text-[9px] font-black uppercase mb-1 block ${darkMode ? 'text-slate-500' : 'text-black'}`}>Hora Início</label><input type="time" value={horarios.inicio} onChange={e => setHorarios({...horarios, inicio: e.target.value})} className={`w-full p-4 rounded-xl font-black text-center outline-none border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-black shadow-inner'}`} /></div>
+                                            <div className="space-y-1 text-left"><label className={`text-[9px] font-black uppercase mb-1 block ${darkMode ? 'text-slate-500' : 'text-black'}`}>Hora Fim</label><input type="time" value={horarios.fim} onChange={e => setHorarios({...horarios, fim: e.target.value})} className={`w-full p-4 rounded-xl font-black text-center outline-none border ${darkMode ? 'bg-slate-950 border-slate-800 text-white' : 'bg-slate-50 border-slate-200 text-black shadow-inner'}`} /></div>
+                                        </div>
+                                    </div>
+                                </section>
+
+                                {items.map((it, idx) => (
+                                    <section key={idx} className={`${darkMode ? 'glass-dark border-white/5' : 'bg-white border-slate-200 shadow-lg'} p-8 rounded-[3.5rem] space-y-6 relative border-l-[12px] ${regType === 'mapeamento' ? 'border-amber-500' : 'border-blue-600'} transition-all text-left text-left text-left`} style={{ zIndex: it.showList ? 200 : 5 }}>
+                                        {items.length > 1 && (
+                                            <button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="absolute top-6 right-6 text-red-500/40 hover:text-red-500 transition-all p-2 bg-red-500/5 rounded-full shadow-inner"><IconTrash /></button>
+                                        )}
+                                        <div className="space-y-2 relative">
+                                            <label className={`text-[10px] font-black uppercase block mb-1 tracking-widest ${darkMode ? 'text-slate-400' : 'text-black'}`}>Equipamento (TAG)</label>
+                                            <div className="relative">
+                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-600"><Building2 size={18} /></div>
+                                                <input type="text" placeholder="BUSCAR TAG..." value={it.search} onFocus={() => { const n = [...items]; n[idx].showList = true; setItems(n); }} onChange={(e) => { const n = [...items]; n[idx].search = e.target.value.toUpperCase(); n[idx].showList = true; setItems(n); }} className={`w-full pl-12 pr-5 py-5 rounded-2xl border outline-none font-black text-sm tracking-widest transition-all ${darkMode ? 'border-slate-800 bg-slate-950 text-blue-400 placeholder-slate-800' : 'border-slate-300 bg-white text-black shadow-inner'}`} />
+                                            </div>
+                                            {it.showList && (
+                                                <div className={`select-window ${darkMode ? 'glass-dark border-white/5' : 'bg-white border-slate-300'} border`}>
+                                                    {(area ? AREA_TAG_MAPPING[area] : EQUIPAMENTOS_ALL).filter(t => t.includes(it.search)).map(tag => (
+                                                        <div key={tag} onClick={() => { const n = [...items]; n[idx].tag = tag; n[idx].search = tag; n[idx].showList = false; n[idx].totalTag = String(EQUIPAMENTOS_TOTAIS[tag]); setItems(n); }} className={`px-6 py-5 text-xs font-bold border-b cursor-pointer ${darkMode ? 'hover:bg-blue-600 text-white' : 'hover:bg-slate-50 text-black'}`}><span>{tag}</span></div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="grid grid-cols-3 gap-2">
                                             {regType === 'mapeamento' ? (
                                                 <React.Fragment>
-                                                    <div className="flex flex-col items-center">
-                                                        <label className="text-[9px] font-black uppercase text-amber-600 block mb-2 text-center leading-none">Obstruídos</label>
-                                                        <input type="number" value={it.obstruidos} onChange={e => { const n = [...items]; n[idx].obstruidos = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-700'}`} placeholder="0" />
-                                                    </div>
-                                                    <div className="flex flex-col items-center">
-                                                        <label className={`text-[9px] font-black uppercase block mb-2 text-center leading-none ${darkMode ? 'text-slate-400' : 'text-black'}`}>Tamponados</label>
-                                                        <input type="number" value={it.tamponados} onChange={e => { const n = [...items]; n[idx].tamponados = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-slate-300' : 'bg-slate-50 border-slate-200 text-black'}`} placeholder="0" />
-                                                    </div>
+                                                    <div className="text-center space-y-1"><label className="text-[9px] font-black uppercase text-amber-600 block leading-none text-center">Obstruídos</label><input type="number" value={it.obstruidos} onChange={e => updateItemValue(idx, 'obstruidos', e.target.value)} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-700'}`} placeholder="0" /></div>
+                                                    <div className="text-center space-y-1"><label className={`text-[9px] font-black uppercase block leading-none text-center ${darkMode ? 'text-slate-400' : 'text-black'}`}>Tamponados</label><input type="number" value={it.tamponados} onChange={e => updateItemValue(idx, 'tamponados', e.target.value)} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-slate-400' : 'bg-slate-100 border-slate-200 text-black shadow-inner'}`} placeholder="0" /></div>
                                                 </React.Fragment>
                                             ) : (
                                                 <React.Fragment>
-                                                    <div className="flex flex-col items-center">
-                                                        <label className="text-[9px] font-black uppercase text-green-600 block mb-2 leading-none text-center">Limpos</label>
-                                                        <input type="number" value={it.limpos} onChange={e => { const n = [...items]; n[idx].limpos = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-green-400' : 'bg-green-50 border-green-200 text-green-700'}`} placeholder="0" />
-                                                    </div>
-                                                    <div className="flex flex-col items-center">
-                                                        <label className="text-[9px] font-black uppercase text-red-600 block mb-2 leading-none text-center">Com Ferro</label>
-                                                        <input type="number" value={it.ferro} onChange={e => { const n = [...items]; n[idx].ferro = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-red-900/30 text-red-500' : 'bg-red-50 border-red-200 text-red-600'}`} placeholder="0" />
-                                                    </div>
+                                                    <div className="text-center space-y-1"><label className="text-[9px] font-black uppercase text-green-600 block leading-none text-center">Limpos</label><input type="number" value={it.limpos} onChange={e => updateItemValue(idx, 'limpos', e.target.value)} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-green-400' : 'bg-green-50 border-green-200 text-green-700'}`} placeholder="0" /></div>
+                                                    <div className="text-center space-y-1"><label className="text-[9px] font-black uppercase text-red-600 block leading-none text-center leading-none">C. Ferro</label><input type="number" value={it.ferro} onChange={e => updateItemValue(idx, 'ferro', e.target.value)} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-red-900/30 text-red-500' : 'bg-red-50 border-red-200 text-red-600'}`} placeholder="0" /></div>
                                                 </React.Fragment>
                                             )}
-                                            <div className="flex flex-col items-center">
-                                                <label className={`text-[9px] font-black uppercase opacity-60 block mb-2 leading-none text-center ${darkMode ? 'text-slate-400' : 'text-black'}`}>Total Tubos</label>
-                                                <input type="number" value={it.totalTag} onChange={e => { const n = [...items]; n[idx].totalTag = e.target.value; setItems(n); }} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-slate-500' : 'bg-slate-100 border-slate-200 text-black'}`} />
-                                            </div>
+                                            <div className="text-center space-y-1"><label className={`text-[9px] font-black uppercase opacity-60 block leading-none text-center ${darkMode ? 'text-slate-400' : 'text-black'}`}>Total</label><input type="number" value={it.totalTag} onChange={e => updateItemValue(idx, 'totalTag', e.target.value)} className={`w-full h-16 rounded-xl text-center font-black text-2xl border outline-none ${darkMode ? 'bg-slate-950 border-slate-900 text-slate-500' : 'bg-slate-100 border-slate-200 text-black shadow-inner'}`} /></div>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <div className="space-y-1 text-left"><label className={`text-[9px] font-black uppercase tracking-widest block leading-none ml-1 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Impactos Identificados</label><input type="text" placeholder="Ex: Acesso difícil..." value={it.impactos} onChange={e => updateItemValue(idx, 'impactos', e.target.value)} className={`w-full p-4 rounded-xl border outline-none text-xs font-bold ${darkMode ? 'bg-slate-950 border-slate-800 text-blue-400' : 'bg-slate-100 border-slate-200 text-black shadow-inner'}`} /></div>
+                                            <div className="space-y-1 text-left"><label className={`text-[9px] font-black uppercase tracking-widest block leading-none ml-1 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Observações Técnicas</label><textarea placeholder="Detalhes adicionais..." value={it.observacoes} onChange={e => updateItemValue(idx, 'observacoes', e.target.value)} className={`w-full p-4 rounded-xl border outline-none text-xs font-medium h-20 resize-none ${darkMode ? 'bg-slate-950 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-black shadow-inner'}`}></textarea></div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-2"><label className={`text-[9px] font-black uppercase block ml-1 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Foto Antes</label><label className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${it.photoBefore ? 'border-green-500/50 bg-green-500/5' : 'border-slate-800 hover:border-blue-500/50'}`}><input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(idx, 'photoBefore', e)} />{it.photoBefore ? <img src={it.photoBefore} className="photo-preview" /> : <><IconCamera size={24} className="text-slate-600" /><span className="text-[8px] font-bold uppercase opacity-40 text-left">Câmara</span></>}</label></div>
+                                            <div className="space-y-2"><label className={`text-[9px] font-black uppercase block ml-1 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Foto Depois</label><label className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${it.photoAfter ? 'border-green-500/50 bg-green-500/5' : 'border-slate-800 hover:border-blue-500/50'}`}><input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(idx, 'photoAfter', e)} />{it.photoAfter ? <img src={it.photoAfter} className="photo-preview" /> : <><IconCamera size={24} className="text-slate-600" /><span className="text-[8px] font-bold uppercase opacity-40 text-left">Câmara</span></>}</label></div>
                                         </div>
                                     </section>
                                 ))}
-                                <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', obstruidos: '', tamponados: '', totalTag: '180', search: '', showList: false }])} className={`w-full py-6 border-2 border-dashed rounded-3xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all ${darkMode ? 'border-blue-500/40 text-blue-500' : 'border-slate-300 text-slate-600 bg-white shadow-sm'}`}>+ Adicionar TAG</button>
-                                <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] active:scale-95 transition-all text-white font-black">{loading ? 'SINCRONIZANDO...' : 'Sincronizar com Alumar Cloud'}</button>
+
+                                <button onClick={() => setItems([...items, { tag: '', limpos: '', ferro: '', obstruidos: '', tamponados: '', totalTag: '180', search: '', showList: false, impactos: '', observacoes: '', photoBefore: null, photoAfter: null }])} className="w-full py-6 border-2 border-dashed border-blue-500/40 rounded-3xl text-blue-500 font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all flex items-center justify-center gap-2 transition-colors">+ Adicionar outra TAG</button>
+                                
+                                <button onClick={handleSend} disabled={loading} className="w-full bg-blue-600 py-7 rounded-[3rem] font-black uppercase text-sm shadow-[0_20px_50px_rgba(37,99,235,0.4)] active:scale-95 text-white flex items-center justify-center gap-3 transition-all"><SendIcon /> {loading ? 'A ENVIAR...' : 'Sincronizar Relatório Pro'}</button>
                             </div>
                         )}
 
                         {view === 'history' && (
-                            <div className="space-y-6 animate-pop pb-12 text-left">
-                                <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-4 rounded-[2.2rem] space-y-4`}>
-                                    <div className="flex gap-2 overflow-x-auto pb-2 hide-scroll no-scrollbar text-[9px] font-black uppercase tracking-widest">
+                            <div className="space-y-6 animate-pop pb-12">
+                                <div className={`${darkMode ? 'glass-dark border-white/5' : 'bg-white shadow-md border border-slate-200'} p-4 rounded-[2.2rem] space-y-4`}>
+                                    <div className="flex gap-2 overflow-x-auto pb-2 hide-scroll no-scrollbar text-[9px] font-black uppercase tracking-widest text-center">
                                         {[{l: 'Hoje', v: '0'}, {l: '3 Dias', v: '3'}, {l: '15 Dias', v: '15'}, {l: 'Personalizado', v: 'custom'}].map(f => (
-                                            <button key={f.v} onClick={() => setHistoryFilter(f.v)} className={`px-5 py-2.5 rounded-full whitespace-nowrap transition-all ${historyFilter === f.v ? 'bg-blue-600 text-white shadow-lg' : (darkMode ? 'bg-slate-900 text-slate-500 border border-white/5' : 'bg-slate-100 text-black')}`}>{f.l}</button>
+                                            <button key={f.v} onClick={() => setHistoryFilter(f.v)} className={`px-5 py-2.5 rounded-full whitespace-nowrap transition-all ${historyFilter === f.v ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : (darkMode ? 'bg-slate-900 text-slate-500 border border-white/5' : 'bg-slate-100 text-black text-center')}`}>{f.l}</button>
                                         ))}
                                     </div>
                                     {historyFilter === 'custom' && (
-                                        <div className={`grid grid-cols-2 gap-3 pt-1 border-t animate-pop ${darkMode ? 'border-white/5' : 'border-slate-100'}`}>
-                                            <div className="space-y-1 text-left"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Início</label><input type="date" value={dateRange.start} onChange={(e) => setDateRange({...dateRange, start: e.target.value})} className={`w-full p-3 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400' : 'bg-white border-slate-300 text-black'}`} /></div>
-                                            <div className="space-y-1 text-left"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black'}`}>Fim</label><input type="date" value={dateRange.end} onChange={(e) => setDateRange({...dateRange, end: e.target.value})} className={`w-full p-3 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400' : 'bg-white border-slate-300 text-black'}`} /></div>
+                                        <div className={`grid grid-cols-2 gap-3 pt-2 border-t animate-pop ${darkMode ? 'border-white/5' : 'border-slate-100'}`}>
+                                            <div className="space-y-1"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black text-left'}`}>Início</label><input type="date" value={dateRange.start} onChange={(e) => setDateRange({...dateRange, start: e.target.value})} className={`w-full p-4 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400 text-center' : 'bg-white border-slate-300 text-black shadow-inner text-center'}`} /></div>
+                                            <div className="space-y-1"><label className={`text-[8px] font-black uppercase ml-2 ${darkMode ? 'text-slate-500' : 'text-black text-left'}`}>Fim</label><input type="date" value={dateRange.end} onChange={(e) => setDateRange({...dateRange, end: e.target.value})} className={`w-full p-4 rounded-xl border text-[10px] font-bold outline-none ${darkMode ? 'bg-slate-950 border-white/10 text-blue-400 text-center' : 'bg-white border-slate-300 text-black shadow-inner text-center'}`} /></div>
                                         </div>
                                     )}
                                 </div>
                                 {filteredHistory.map(h => (
-                                    <div key={h.id} className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-100'} p-8 rounded-[3.5rem] relative overflow-hidden flex justify-between items-center group border-l-4 ${h.type === 'mapeamento' ? 'border-l-amber-500' : 'border-l-blue-600'}`}>
-                                        <div className="space-y-1">
-                                            <p className={`text-[9px] font-black uppercase tracking-widest ${h.type === 'mapeamento' ? 'text-amber-500' : 'text-blue-600'}`}>{h.type === 'mapeamento' ? 'Mapeamento Inicial' : h.company}</p>
+                                    <div key={h.id} className={`${darkMode ? 'glass-dark border-white/5 shadow-2xl' : 'bg-white shadow-md border border-slate-100'} p-8 rounded-[3.5rem] relative overflow-hidden flex justify-between items-center border-l-4 ${h.type === 'mapeamento' ? 'border-l-amber-500' : 'border-l-blue-600'} mb-3 transition-all active:scale-95 text-left`}>
+                                        <div className="space-y-2 text-left text-left">
+                                            <p className={`text-[9px] font-black uppercase tracking-widest ${h.type === 'mapeamento' ? 'text-amber-500 text-left' : 'text-blue-600 text-left'}`}>{h.type === 'mapeamento' ? 'Mapeamento' : h.company}</p>
                                             <h4 className={`text-xl font-black uppercase tracking-tighter leading-none ${darkMode ? 'text-white' : 'text-black'}`}>{h.items?.[0]?.tag}</h4>
-                                            <p className={`text-[9px] font-bold uppercase flex items-center gap-2 ${darkMode ? 'opacity-40' : 'text-slate-500'}`}><Clock size={10} /> {h.data} • {h.hora} • Turno {h.turno}</p>
+                                            <div className="flex flex-wrap gap-2 text-[8px] font-bold uppercase opacity-60 text-slate-400 text-left">
+                                                <span className="flex items-center gap-1 text-left"><Clock size={10} /> {h.data} • {h.hora}</span>
+                                                <span className="bg-slate-800 px-1.5 py-0.5 rounded text-white shadow-sm">{h.turno}</span>
+                                                <span className="bg-blue-900 px-1.5 py-0.5 rounded text-white shadow-sm">{h.bomba}</span>
+                                            </div>
+                                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-tighter text-left">Horas: {h.horarios?.inicio} - {h.horarios?.fim}</p>
                                         </div>
-                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${darkMode ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-green-600 text-white shadow-md shadow-green-200'}`}><Send size={18} /></button>
+                                        {/* BOTÃO WHATSAPP - ÍCONE AMPLIADO (PRO v4.5) */}
+                                        <button onClick={() => window.open(getWhatsAppLink(h), '_blank')} className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all bg-green-600 text-white shadow-[0_8px_25px_rgba(22,163,74,0.5)] active:scale-90 hover:scale-105`}>
+                                            <IconWhatsAppShare size={42} />
+                                        </button>
                                     </div>
                                 ))}
                             </div>
                         )}
 
                         {view === 'dash' && (
-                            <div className="space-y-6 animate-pop text-left">
-                                <div className="dashboard-header-fixed">
-                                    <button onClick={handleExportCSV} className={`w-full py-5 rounded-[2rem] font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-3 shadow-2xl active:scale-95 transition-all ${darkMode ? 'bg-blue-600 text-white shadow-blue-500/30' : 'bg-slate-900 text-white'}`}>
+                            <div className="space-y-6 animate-pop text-left text-left text-left text-left text-left text-left">
+                                <div className="dashboard-header-fixed text-left text-left text-left">
+                                    <button onClick={handleExport} className={`w-full py-5 rounded-[2.5rem] font-black uppercase text-[10px] tracking-[0.2em] flex items-center justify-center gap-3 shadow-[0_20px_60px_rgba(0,0,0,0.4)] active:scale-95 transition-all ${darkMode ? 'bg-blue-600 text-white shadow-blue-600/30' : 'bg-slate-900 text-white shadow-slate-900/30 shadow-lg'}`}>
                                         <DownloadIcon /> Exportar Base Master Excel
                                     </button>
                                 </div>
 
-                                <section className={`${darkMode ? 'glass-dark border-t-blue-600' : 'bg-white shadow-lg border border-slate-200 border-t-blue-700'} p-10 rounded-[4.5rem] border-t-8 relative overflow-hidden`}>
-                                    <div className="flex justify-between items-start mb-6">
-                                        <div className="space-y-1">
-                                            <p className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-blue-500' : 'text-blue-700'}`}>Produção Turno {turno}</p>
+                                <section className={`${darkMode ? 'glass-dark border-t-blue-600 shadow-2xl' : 'bg-white shadow-lg border border-slate-200 border-t-blue-700'} p-10 rounded-[4.5rem] border-t-8 relative overflow-hidden text-left text-left text-left`}>
+                                    <div className="flex justify-between items-start mb-6 text-left">
+                                        <div className="space-y-1 text-left text-left text-left text-left text-left">
+                                            <p className={`text-[9px] font-black uppercase tracking-widest ${darkMode ? 'text-blue-500 text-left' : 'text-blue-700 text-left'}`}>Produção Turno {turno}</p>
                                             <h2 className={`text-6xl font-black tracking-tighter leading-none ${darkMode ? 'text-white' : 'text-black'}`}>{stats.curShiftProd}</h2>
-                                            <p className={`text-[10px] opacity-40 font-bold uppercase ${darkMode ? '' : 'text-black'}`}>Tubos Limpos Hoje</p>
+                                            <p className={`text-[10px] opacity-40 font-bold uppercase ${darkMode ? '' : 'text-black text-left'} tracking-widest text-left text-left text-left text-left`}>Tubos Limpos Hoje</p>
                                         </div>
-                                        <div className="bg-blue-600/10 px-4 py-2 rounded-2xl border border-blue-600/20 text-center">
-                                            <p className="text-blue-500 font-black text-lg leading-none">60</p>
-                                            <p className="text-[7px] font-black uppercase text-blue-400">Meta Turno</p>
+                                        <div className="bg-blue-600/10 px-4 py-2 rounded-2xl border border-blue-600/20 text-center text-center text-center text-center">
+                                            <p className="text-blue-500 font-black text-lg leading-none text-center text-center text-center">60</p>
+                                            <p className="text-[7px] font-black uppercase text-blue-400 text-center text-center text-center">Meta</p>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-[9px] font-black uppercase opacity-40">
-                                            <span className={darkMode ? '' : 'text-black'}>Eficiência no Turno</span>
-                                            <span className={darkMode ? '' : 'text-black'}>{Math.round((stats.curShiftProd/60)*100)}%</span>
-                                        </div>
-                                        <div className={`w-full h-4 rounded-full overflow-hidden p-0.5 border ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200'}`}>
-                                            <div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.6)]" style={{ width: `${Math.min((stats.curShiftProd/60)*100, 100)}%` }}></div>
-                                        </div>
+                                    <div className="space-y-2 text-left text-left text-left text-left">
+                                        <div className="flex justify-between text-[9px] font-black uppercase opacity-40 text-left text-left text-left"><span className={darkMode ? '' : 'text-black text-left text-left'}>Saldo Pendente Real</span><span className={darkMode ? '' : 'text-black text-right'}>{stats.saldoReal} Tubos</span></div>
+                                        <div className={`w-full h-4 rounded-full overflow-hidden p-0.5 border ${darkMode ? 'bg-white/5 border-white/5' : 'bg-slate-100 border-slate-200 shadow-inner'}`}><div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(59,130,246,0.6)]" style={{ width: `${Math.min((stats.curShiftProd/60)*100, 100)}%` }}></div></div>
                                     </div>
                                 </section>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className={`${darkMode ? 'glass-dark border-t-green-500' : 'bg-white shadow-md border border-slate-200 border-t-green-500'} p-8 rounded-[3rem] border-t-4 transition-all`}>
-                                        <p className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalLimposAcumulado}</p>
-                                        <p className="text-[8px] font-black opacity-30 uppercase tracking-wider leading-none mt-1 text-green-600">Total Limpos<br/>(Produção)</p>
-                                    </div>
-                                    <div className={`${darkMode ? 'glass-dark border-t-amber-500' : 'bg-white shadow-md border border-slate-200 border-t-amber-500'} p-8 rounded-[3rem] border-t-4 transition-all`}>
-                                        <p className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalMapeados}</p>
-                                        <p className="text-[8px] font-black opacity-30 uppercase tracking-wider leading-none mt-1 text-amber-600">Total Mapeados<br/>(Inicial)</p>
-                                    </div>
+                                <div className="grid grid-cols-2 gap-4 text-left text-left text-left">
+                                    <div className={`${darkMode ? 'glass-dark border-t-green-500 shadow-xl' : 'bg-white shadow-md border border-slate-100 border-t-green-500'} p-8 rounded-[3rem] border-t-4 transition-all text-left text-left text-left`}><p className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalLimposAcumulado}</p><p className="text-[8px] font-black opacity-30 uppercase tracking-wider leading-none mt-1 text-green-600 text-left text-left text-left">Total Limpos<br/>(Produção)</p></div>
+                                    <div className={`${darkMode ? 'glass-dark border-t-amber-500 shadow-xl' : 'bg-white shadow-md border border-slate-100 border-t-amber-500'} p-8 rounded-[3rem] border-t-4 transition-all text-left text-left text-left text-left`}><p className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalObstruidosAcumulado}</p><p className="text-[8px] font-black opacity-30 uppercase tracking-wider leading-none mt-1 text-amber-600 text-left text-left text-left text-left">Total Mapeado<br/>(Inicial)</p></div>
                                 </div>
 
-                                <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-8 rounded-[3.5rem] flex justify-between items-center`}>
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-red-500">Saldo com Ferro/Obstrução</p>
-                                        <h4 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalObstruidosAcumulado} <span className="text-[10px] opacity-20 font-bold uppercase">Tubos</span></h4>
-                                        <p className="text-[8px] font-bold opacity-30 uppercase">Registrados no Mapeamento Inicial</p>
-                                    </div>
-                                    <div className="w-12 h-12 rounded-full bg-red-600/10 flex items-center justify-center text-red-500 border border-red-500/20">
-                                        <IconAlert />
-                                    </div>
+                                <div className="space-y-4 pt-4 text-left text-left text-left text-left">
+                                    <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] ml-2 ${darkMode ? 'text-slate-500 text-left' : 'text-slate-400 text-left'}`}>Últimas Atividades na Planta</h3>
+                                    {history.slice(0, 3).map(h => (
+                                        <div key={h.id} className={`${darkMode ? 'bg-white/5 border-white/5' : 'bg-white border border-slate-100 shadow-sm'} p-5 rounded-3xl flex justify-between items-center border transition-all text-left text-left`}>
+                                            <div className="text-left text-left text-left text-left">
+                                                <p className={`text-[10px] font-black ${darkMode ? 'text-blue-400 text-left' : 'text-blue-700 text-left'} uppercase`}>{h.items?.[0]?.tag}</p>
+                                                <p className="text-[8px] opacity-40 font-bold uppercase text-left text-left text-left">{h.data} • {h.hora}</p>
+                                            </div>
+                                            <p className={`text-xs font-black ${h.type === 'producao' ? 'text-green-500 text-right' : 'text-amber-500 text-right'}`}>
+                                                {h.type === 'producao' ? `+${h.items?.[0]?.limpos} Limpos` : `! Mapeado`}
+                                            </p>
+                                        </div>
+                                    ))}
                                 </div>
+                            </div>
+                        )}
 
-                                <div className={`${darkMode ? 'glass-dark' : 'bg-white shadow-md border border-slate-200'} p-8 rounded-[3.5rem] flex justify-between items-center`}>
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Tamponados</p>
-                                        <h4 className={`text-2xl font-black ${darkMode ? 'text-white' : 'text-black'}`}>{stats.totalTamponadosAcumulado} <span className="text-[10px] opacity-20 font-bold uppercase">Tubos</span></h4>
-                                    </div>
-                                    <div className="w-12 h-12 rounded-full bg-slate-600/10 flex items-center justify-center text-slate-400 border border-slate-500/20">
-                                        <IconShield />
-                                    </div>
+                        {view === 'users' && user.email === ADMIN_EMAIL && (
+                            <div className="space-y-6 animate-pop text-left text-left text-left text-left text-left">
+                                <div className="space-y-2 ml-2 text-left text-left text-left text-left text-left text-left">
+                                    <h3 className="text-[10px] font-black uppercase text-slate-500 tracking-widest leading-none text-left text-left text-left">Gestão de Equipa Alumar ({allUsers.length})</h3>
+                                    <p className="text-[8px] text-slate-600 uppercase font-bold leading-none mt-1 text-left text-left text-left text-left text-left">Autorize o acesso dos funcionários ativos</p>
+                                </div>
+                                <div className="space-y-3">
+                                    {allUsers.map(u => (
+                                        <div key={u.uid} className={`${darkMode ? 'glass-dark border-white/5 shadow-lg' : 'bg-white shadow-md border border-slate-100'} p-6 rounded-[2.5rem] flex justify-between items-center transition-all mb-3 text-left text-left text-left`}>
+                                            <div className="text-left text-left text-left text-left"><p className={`text-[11px] font-black ${darkMode ? 'text-white' : 'text-black'}`}>{u.email}</p><p className={`text-[8px] font-bold uppercase ${u.status === 'authorized' ? 'text-green-500' : 'text-amber-500'}`}>{u.status === 'authorized' ? 'Autorizado' : 'Pendente'}</p></div>
+                                            {u.email !== ADMIN_EMAIL && (
+                                                <button onClick={() => toggleAuth(u.uid, u.status)} className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-lg ${u.status === 'authorized' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-green-500/10 text-green-500 border border-green-500/20'}`}>{u.status === 'authorized' ? <IconShield /> : <IconCheck size={18} />}</button>
+                                            )}
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
                     </main>
 
-                    <nav className={`fixed bottom-0 left-0 right-0 border-t p-6 flex justify-around items-center rounded-t-[5.5rem] z-[150] shadow-[0_-30px_90px_rgba(0,0,0,0.1)] backdrop-blur-3xl transition-all duration-300 ${darkMode ? 'glass-dark border-white/10 bg-slate-950/90' : 'bg-white border-slate-200 shadow-2xl'}`}>
-                        <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1 transition-all duration-300 ${view === 'history' ? 'text-blue-600 scale-110' : (darkMode ? 'text-slate-400 opacity-60' : 'text-slate-600')}`}>
-                            <IconHistory />
-                            <span className="text-[8px] font-black uppercase tracking-widest text-[7px]">Registos</span>
-                        </button>
-                        <button onClick={() => setView('form')} className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 center-btn ${view === 'form' ? 'bg-blue-600 text-white scale-110' : (darkMode ? 'bg-slate-800 text-slate-400 border-[#0f172a]' : 'bg-slate-50 text-slate-500 border-slate-200 shadow-inner')}`}>
+                    {/* NAV BAR */}
+                    <nav className={`fixed bottom-0 left-0 right-0 border-t p-6 pb-10 flex justify-around items-center rounded-t-[5.5rem] z-[150] shadow-[0_-30px_90px_rgba(0,0,0,0.1)] backdrop-blur-3xl transition-all duration-300 ${darkMode ? 'glass-dark border-white/10 bg-slate-950/90' : 'bg-white border-slate-200 shadow-2xl'}`}>
+                        <button onClick={() => setView('history')} className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${view === 'history' ? 'text-blue-500 scale-110' : 'text-slate-400 opacity-60'}`}><IconHistory size={26} strokeWidth={view === 'history' ? 3 : 2} /><span className="text-[8px] font-black uppercase tracking-widest text-[7px]">Registos</span></button>
+                        <button onClick={() => setView('form')} className={`w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 center-btn ${view === 'form' ? 'bg-blue-600 text-white scale-110' : (darkMode ? 'bg-slate-800 text-slate-400 border-[#0f172a]' : 'bg-slate-100 text-slate-500 shadow-inner shadow-lg')}`}>
                             <IconPlus />
                         </button>
-                        <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-1 transition-all duration-300 ${view === 'dash' ? 'text-blue-600 scale-110' : (darkMode ? 'text-slate-400 opacity-60' : 'text-slate-600')}`}>
-                            <IconDashboard />
-                            <span className="text-[8px] font-black uppercase tracking-widest text-[7px]">Painel</span>
-                        </button>
+                        <button onClick={() => setView('dash')} className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${view === 'dash' ? 'text-blue-500 scale-110' : 'text-slate-400 opacity-60'}`}><IconDashboard size={26} strokeWidth={view === 'dash' ? 3 : 2} /><span className="text-[8px] font-black uppercase tracking-widest text-[7px]">Painel</span></button>
+                        {user?.email === ADMIN_EMAIL && (
+                            <button onClick={() => setView('users')} className={`flex flex-col items-center gap-1.5 transition-all duration-300 ${view === 'users' ? 'text-red-500 scale-110' : 'text-slate-400 opacity-60'}`}><IconUsers size={26} strokeWidth={view === 'users' ? 3 : 2} /><span className="text-[8px] font-black uppercase tracking-widest text-[7px]">Equipa</span></button>
+                        )}
                     </nav>
                 </div>
             );
